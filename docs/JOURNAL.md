@@ -29,3 +29,8 @@
 - **Built:** REST endpoints `GET /api/docs/<id>/history/`, `GET /api/docs/<id>/at/<seq>/`, and `POST /api/docs/<id>/revert/<seq>/`. Interactive history modal UI with scrub slider and read-only diff preview. ADR 003 documenting why revert is implemented as forward compensating operations. Test suite in `tests/test_history.py` demonstrating zero conflict when reverting while concurrent peers continue typing.
 - **Broke / Debugged:** Ensured compensating operations for revert delete from highest visible index downward to preserve index consistency during diff application.
 - **Learned:** Why append-only compensating operations make document history strictly immutable, auditable, and inherently conflict-free across active collaborators.
+
+## Day 7 — Scale, Observability & Delivery
+- **Built:** High-concurrency load testing swarm (`loadtest/swarm.py`) measuring p50/p95/p99 latency with 50, 100, and 200 concurrent clients. Prometheus metrics export on `/metrics` with operations counters, latency histograms, and active connection gauges. Multi-replica Docker Compose setup with Nginx load balancer and 2 Daphne ASGI workers. Comprehensive documentation in `docs/BENCHMARKS.md` and complete portfolio `README.md`.
+- **Broke / Debugged:** Configured Nginx WebSocket reverse proxying with `Upgrade` and `Connection` headers and sticky connection timeout settings to prevent premature connection dropouts.
+- **Learned:** How the Redis channel layer seamlessly routes messages across independent Daphne worker processes to achieve linear horizontal scalability.
