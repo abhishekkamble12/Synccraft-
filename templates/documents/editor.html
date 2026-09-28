@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+
+{% block title %}{{ document.title }} — Monach Sync{% endblock %}
+
+{% block content %}
+<div class="editor-workspace">
+  <!-- Top Bar -->
+  <div class="editor-header">
+    <div class="editor-title-container">
+      <a href="{% url 'document_list' %}" class="btn btn-secondary" style="padding: 0.35rem 0.65rem;">← Back</a>
+      <span class="editor-title">{{ document.title }}</span>
+      <span class="brand-badge" style="background: var(--bg-tertiary);">Role: {{ user_role }}</span>
+    </div>
+
+    <!-- Actions & Active Collaborators Presence -->
+    <div style="display: flex; align-items: center; gap: 1rem;">
+      <button id="historyModalBtn" class="btn btn-secondary" style="padding: 0.35rem 0.75rem;">
+        📜 Version History
+      </button>
+
+      <div class="presence-bar" id="presenceBar">
+        <!-- Injected dynamically by presence.js -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Text Editor Container -->
+  <div class="editor-container" id="editorContainer">
+    <textarea
+      id="collaborativeEditor"
+      class="editor-textarea"
+      placeholder="Start typing simultaneously with other peers..."
+      spellcheck="false"
+      {% if user_role == 'viewer' %}readonly{% endif %}
+    >{{ initial_text }}</textarea>
+  </div>
+
+  <!-- Real-Time Metrics & Status Footer -->
+  <div class="status-bar">
+    <div class="status-pill">
+      <div class="status-dot" id="connectionDot"></div>
+      <span id="connectionStatusText">Connecting...</span>
+    </div>
+
+    <div class="stats-group">
+      <div class="stat-item">Doc Seq: <span id="statDocSeq">{{ document.head_seq }}</span></div>
+      <div class="stat-item">Local Ops: <span id="statLocalOps">0</span></div>
+      <div class="stat-item">Remote Ops: <span id="statRemoteOps">0</span></div>
+      <div class="stat-item">RTT Latency: <span id="statLatency">-- ms</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- History & Time-Travel Modal -->
+<div id="historyModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 100; align-items: center; justify-content: center;">
+  <div style="background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 0.5rem; width: 90%; max-width: 700px; padding: 1.5rem; display: flex; flex-direction: column; gap: 1.25rem;">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <h3 style="font-size: 1.25rem; font-weight: 700;">Document Version History</h3>
+      <button id="closeHistoryBtn" class="btn btn-secondary" style="padding: 0.25rem 0.5rem;">✕</button>
+    </div>
+
+    <div>
+      <label style="display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem;">
+        <span>Historical Revision Scrubbing:</span>
+        <span>Sequence: <strong id="sliderSeqVal" style="color: var(--accent);">{{ document.head_seq }}</strong> / {{ document.head_seq }}</span>
+      </label>
+      <input
+        type="range"
+        id="historySlider"
+        min="0"
+        max="{{ document.head_seq }}"
+        value="{{ document.head_seq }}"
+        style="width: 100%; accent-color: var(--accent); cursor: pointer;"
+      >
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+      <span style="font-size: 0.8rem; color: var(--text-muted);">Preview at Selected Revision (Read-Only):</span>
+      <textarea
+        id="historyPreviewArea"
+        class="editor-textarea"
+        style="height: 220px; background: var(--bg-primary); border: 1px solid var(--border); border-radius: 0.375rem;"
+        readonly
+      >{{ initial_text }}</textarea>
+    </div>
+
+    <div style="display: flex; justify-content: flex-end; gap: 0.75rem;">
+      <button id="cancelHistoryBtn" class="btn btn-secondary">Close</button>
+      <button id="revertBtn" class="btn btn-danger">⏪ Revert Document to this Version</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+{% load static %}
+<script src="{% static 'js/rga.js' %}"></script>
+<script src="{% static 'js/sync.js' %}"></script>
+<script src="{% static 'js/presence.js' %}"></script>
+<script src="{% static 'js/editor.js' %}"></script>
+
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const config = {
+      docId: "{{ document.id }}",
+      siteId: "{{ site_id }}",
+      username: "{{ request.user.username|default:'Anonymous' }}",
+      userRole: "{{ user_role }}",
+      csrfToken: "{{ csrf_token }}",
+      wsUrl: `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws/docs/{{ document.id }}/`
+    };
+
+    window.App = new CollaborativeEditorApp(config);
+
+    // Wire up History Modal UI
+    const modal = document.getElementById('historyModal');
+    const openBtn = document.getElementById('historyModalBtn');
+    const closeBtn = document.getElementById('closeHistoryBtn');
+    const cancelBtn = document.getElementById('cancelHistoryBtn');
+    const slider = document.getElementById('historySlider');
+    const sliderVal = document.getElementById('sliderSeqVal');
+    const preview = document.getElementById('historyPreviewArea');
+    const revertBtn = document.getElementById('revertBtn');
+
+    openBtn.addEventListener('click', () => {
+      modal.style.display = 'flex';
+      slider.max = window.App.statDocSeq ? window.App.statDocSeq.textContent : '0';
+      slider.value = slider.max;
+      sliderVal.textContent = slider.value;
+      fetchHistoryPreview(slider.value);
+    });
+
+    const hideModal = () => { modal.style.display = 'none'; };
+    closeBtn.addEventListener('click', hideModal);
+    cancelBtn.addEventListener('click', hideModal);
+
+    slider.addEventListener('input', (e) => {
+      const seq = e.target.value;
+      sliderVal.textContent = seq;
+      fetchHistoryPreview(seq);
+    });
+
+    async function fetchHistoryPreview(seq) {
+      try {
+        const res = await fetch(`/api/docs/{{ document.id }}/at/${seq}/`);
+        if (res.ok) {
+          const data = await res.json();
+          preview.value = data.text;
+        }
+      } catch (err) {
+        console.error('History preview fetch error:', err);
+      }
+    }
+
+    revertBtn.addEventListener('click', async () => {
+      const seq = slider.value;
+      if (!confirm(`Are you sure you want to revert the document to revision #${seq}?`)) return;
+
+      try {
+        const res = await fetch(`/api/docs/{{ document.id }}/revert/${seq}/`, {
+          method: 'POST',
+          headers: {
+            'X-CSRFToken': config.csrfToken,
+            'Content-Type': 'application/json'
+          }
+        });
+        const data = await res.json();
+        if (res.ok) {
+          alert(`Revert complete! Applied ${data.ops_applied} compensating operations.`);
+          hideModal();
+        } else {
+          alert(data.error || 'Failed to revert.');
+        }
+      } catch (err) {
+        alert('Revert network error.');
+      }
+    });
+  });
+</script>
+{% endblock %}

@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Monach Sync Engine{% endblock %}</title>
+  {% load static %}
+  <link rel="stylesheet" href="{% static 'css/editor.css' %}">
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+  <nav class="navbar">
+    <a href="{% url 'document_list' %}" class="brand">
+      <span>⚡ Monach Sync</span>
+      <span class="brand-badge">CRDT Engine</span>
+    </a>
+    <div class="nav-links">
+      {% if user.is_authenticated %}
+        <span class="nav-user">👤 {{ user.username }}</span>
+        <form method="post" action="{% url 'logout' %}" style="display:inline;">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-secondary" style="padding:0.35rem 0.75rem;">Logout</button>
+        </form>
+      {% else %}
+        <a href="{% url 'login' %}" class="btn btn-secondary">Login</a>
+        <a href="{% url 'register' %}" class="btn">Register</a>
+      {% endif %}
+    </div>
+  </nav>
+
+  <main class="container">
+    {% block content %}{% endblock %}
+  </main>
+
+  {% block extra_scripts %}{% endblock %}
+</body>
+</html>
