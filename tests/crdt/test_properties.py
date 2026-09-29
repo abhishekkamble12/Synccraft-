@@ -8,12 +8,12 @@ Invariants verified:
 """
 
 import random
-from hypothesis import given, settings, strategies as st
-import pytest
+
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 from crdt.ops import Op
 from crdt.rga import RGA
-
 
 # Strategy to generate valid character payloads
 char_strategy = st.characters(

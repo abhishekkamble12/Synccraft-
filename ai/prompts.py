@@ -22,7 +22,6 @@ PROMPTS = {
 </document_text>
 
 Rewrite the above text following the instruction. Return only the revised text:""",
-
     "grammar_v1": """Fix any grammatical, spelling, and punctuation errors in the text below while preserving the exact tone and voice:
 
 <document_text>
@@ -30,7 +29,6 @@ Rewrite the above text following the instruction. Return only the revised text:"
 </document_text>
 
 Return only the corrected text:""",
-
     "shorten_v1": """Make the following text more concise, direct, and punchy while retaining its core meaning:
 
 <document_text>
@@ -38,7 +36,6 @@ Return only the corrected text:""",
 </document_text>
 
 Return only the shortened text:""",
-
     "continue_v1": """Continue writing from where the following text leaves off, matching its style and vocabulary:
 
 <document_text>
@@ -46,7 +43,6 @@ Return only the shortened text:""",
 </document_text>
 
 Continue writing the next 1-2 paragraphs:""",
-
     "summary_v1": """Summarize what changed in this document based on the following before/after snapshot:
 
 Before:

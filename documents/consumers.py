@@ -3,16 +3,16 @@ WebSocket consumer for real-time document synchronization and presence.
 """
 
 import asyncio
-from typing import Any
 import uuid
+from typing import Any
 
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
 from django.contrib.auth.models import User
 
 from ai.agent_peer import AIPeer
-from ai.guards import check_rate_limit, check_and_increment_token_budget
-from ai.tasks import rewrite_task, summarize_missed_edits_task, suggestion_task
+from ai.guards import check_and_increment_token_budget, check_rate_limit
+from ai.tasks import rewrite_task, suggestion_task
 from crdt.ops import Op
 from documents.models import AIJob, Collaborator, Document, Suggestion
 from documents.services import (
@@ -73,7 +73,9 @@ class DocumentConsumer(AsyncJsonWebsocketConsumer):
     async def disconnect(self, close_code: int) -> None:
         if self.group_name:
             # Broadcast user left presence
-            username = self.user.username if (self.user and self.user.is_authenticated) else "Anonymous"
+            username = (
+                self.user.username if (self.user and self.user.is_authenticated) else "Anonymous"
+            )
             await self.channel_layer.group_send(
                 self.group_name,
                 {
@@ -107,7 +109,11 @@ class DocumentConsumer(AsyncJsonWebsocketConsumer):
             await self._handle_suggestion_reject(content)
         else:
             await self.send_json(
-                {"type": "error", "code": "unknown_message_type", "message": f"Unknown type: {msg_type}"}
+                {
+                    "type": "error",
+                    "code": "unknown_message_type",
+                    "message": f"Unknown type: {msg_type}",
+                }
             )
 
     # -------------------------------------------------------------------------
@@ -117,7 +123,11 @@ class DocumentConsumer(AsyncJsonWebsocketConsumer):
     async def _handle_op_message(self, content: dict[str, Any]) -> None:
         if self.role == "viewer":
             await self.send_json(
-                {"type": "error", "code": "forbidden", "message": "Viewers do not have edit permissions."}
+                {
+                    "type": "error",
+                    "code": "forbidden",
+                    "message": "Viewers do not have edit permissions.",
+                }
             )
             return
 
@@ -203,7 +213,11 @@ class DocumentConsumer(AsyncJsonWebsocketConsumer):
         )
 
     async def _handle_presence_message(self, content: dict[str, Any]) -> None:
-        username = self.user.username if (self.user and self.user.is_authenticated) else content.get("user", "Anonymous")
+        username = (
+            self.user.username
+            if (self.user and self.user.is_authenticated)
+            else content.get("user", "Anonymous")
+        )
         payload = {
             "type": "presence",
             "user": username,
@@ -226,11 +240,17 @@ class DocumentConsumer(AsyncJsonWebsocketConsumer):
     async def _handle_ai_request_message(self, content: dict[str, Any]) -> None:
         if self.role == "viewer":
             await self.send_json(
-                {"type": "error", "code": "forbidden", "message": "Viewers cannot request AI edits."}
+                {
+                    "type": "error",
+                    "code": "forbidden",
+                    "message": "Viewers cannot request AI edits.",
+                }
             )
             return
 
-        user_key = str(self.user.id) if (self.user and self.user.is_authenticated) else self.channel_name
+        user_key = (
+            str(self.user.id) if (self.user and self.user.is_authenticated) else self.channel_name
+        )
         allowed, remaining = check_rate_limit(user_key)
         if not allowed:
             await self.send_json(
@@ -309,7 +329,13 @@ class DocumentConsumer(AsyncJsonWebsocketConsumer):
 
     async def _handle_suggestion_accept(self, content: dict[str, Any]) -> None:
         if self.role == "viewer":
-            await self.send_json({"type": "error", "code": "forbidden", "message": "Viewer cannot accept suggestions."})
+            await self.send_json(
+                {
+                    "type": "error",
+                    "code": "forbidden",
+                    "message": "Viewer cannot accept suggestions.",
+                }
+            )
             return
 
         suggestion_id = content.get("suggestion_id")
@@ -386,7 +412,9 @@ class DocumentConsumer(AsyncJsonWebsocketConsumer):
 
     @database_sync_to_async
     def _cancel_ai_job(self, job_id: str) -> None:
-        AIJob.objects.filter(id=job_id).update(status="cancelled", error_message="Cancelled by user")
+        AIJob.objects.filter(id=job_id).update(
+            status="cancelled", error_message="Cancelled by user"
+        )
 
     @database_sync_to_async
     def _apply_suggestion(self, suggestion_id: str) -> bool:

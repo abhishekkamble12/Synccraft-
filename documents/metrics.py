@@ -3,10 +3,10 @@ Prometheus metrics collectors and structured logging utilities for collaborative
 """
 
 from typing import Any
-import time
 
 try:
-    from prometheus_client import Counter, Gauge, Histogram, generate_latest, CONTENT_TYPE_LATEST
+    from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, Histogram, generate_latest
+
     PROMETHEUS_AVAILABLE = True
 except ImportError:
     PROMETHEUS_AVAILABLE = False
@@ -61,14 +61,26 @@ if PROMETHEUS_AVAILABLE:
 else:
     # Fallback no-op objects if prometheus_client is not installed
     class NoOpMetric:
-        def inc(self, *args: Any, **kwargs: Any) -> None: pass
-        def dec(self, *args: Any, **kwargs: Any) -> None: pass
-        def set(self, *args: Any, **kwargs: Any) -> None: pass
-        def labels(self, *args: Any, **kwargs: Any) -> "NoOpMetric": return self
+        def inc(self, *args: Any, **kwargs: Any) -> None:
+            pass
+
+        def dec(self, *args: Any, **kwargs: Any) -> None:
+            pass
+
+        def set(self, *args: Any, **kwargs: Any) -> None:
+            pass
+
+        def labels(self, *args: Any, **kwargs: Any) -> "NoOpMetric":
+            return self
+
         def time(self) -> Any:
             class DummyContext:
-                def __enter__(self) -> None: pass
-                def __exit__(self, *args: Any) -> None: pass
+                def __enter__(self) -> None:
+                    pass
+
+                def __exit__(self, *args: Any) -> None:
+                    pass
+
             return DummyContext()
 
     OPS_TOTAL = NoOpMetric()  # type: ignore[assignment]

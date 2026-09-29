@@ -36,6 +36,7 @@ class SimulatedClient:
     async def connect(self) -> None:
         try:
             import websockets
+
             self.ws = await websockets.connect(self.ws_url)
             # Receive initial state
             init_msg = json.loads(await self.ws.recv())
@@ -109,7 +110,9 @@ async def run_swarm(
     ws_url = f"{base_ws_url}/ws/docs/{doc_id}/"
     clients = [SimulatedClient(f"client_{i}", doc_id, ws_url) for i in range(num_clients)]
 
-    print(f"\n🚀 Launching swarm of {num_clients} concurrent clients ({ops_per_client} ops/client)...")
+    print(
+        f"\n🚀 Launching swarm of {num_clients} concurrent clients ({ops_per_client} ops/client)..."
+    )
 
     # Connect all clients
     await asyncio.gather(*(c.connect() for c in clients))
@@ -149,8 +152,12 @@ async def run_swarm(
         "duration_sec": round(total_duration, 2),
         "throughput_ops_sec": round(throughput_ops_sec, 1),
         "p50_latency_ms": round(statistics.median(all_latencies), 2) if all_latencies else 0,
-        "p95_latency_ms": round(statistics.quantiles(all_latencies, n=20)[18], 2) if len(all_latencies) >= 20 else 0,
-        "p99_latency_ms": round(statistics.quantiles(all_latencies, n=100)[98], 2) if len(all_latencies) >= 100 else 0,
+        "p95_latency_ms": round(statistics.quantiles(all_latencies, n=20)[18], 2)
+        if len(all_latencies) >= 20
+        else 0,
+        "p99_latency_ms": round(statistics.quantiles(all_latencies, n=100)[98], 2)
+        if len(all_latencies) >= 100
+        else 0,
         "convergence_rate": f"{convergence_rate:.1f}%",
         "final_doc_len": len(reference_text),
     }
@@ -171,7 +178,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run collaborative CRDT load test swarm")
     parser.add_argument("--clients", type=int, default=50, help="Number of concurrent clients")
     parser.add_argument("--ops", type=int, default=20, help="Ops per client")
-    parser.add_argument("--doc", type=str, default="00000000-0000-0000-0000-000000000001", help="Document UUID")
+    parser.add_argument(
+        "--doc", type=str, default="00000000-0000-0000-0000-000000000001", help="Document UUID"
+    )
     parser.add_argument("--url", type=str, default="ws://127.0.0.1:8000", help="Base WebSocket URL")
 
     args = parser.parse_args()

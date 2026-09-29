@@ -5,18 +5,17 @@ The AI peer interacts with the document strictly through the same CRDT operation
 (inserts, deletes, Lamport clock updates) as human users, ensuring mathematical convergence.
 """
 
-import asyncio
-from difflib import SequenceMatcher
 import logging
 import time
-from typing import Any, AsyncIterator
 import uuid
+from difflib import SequenceMatcher
+from typing import Any
 
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 from django.contrib.auth.models import User
 
-from ai.client import BaseLLMClient, FakeLLMClient, OpenAICompatibleLLMClient
+from ai.client import BaseLLMClient, OpenAICompatibleLLMClient
 from ai.guards import (
     sanitize_document_text,
     validate_input_bounds,
@@ -25,12 +24,11 @@ from ai.guards import (
 from ai.prompts import (
     PROMPTS,
     SYSTEM_PROMPT_COAUTHOR,
-    SYSTEM_PROMPT_SUMMARY,
 )
-from crdt.ids import CharId, ROOT
+from crdt.ids import CharId
 from crdt.ops import Op
 from crdt.rga import RGA
-from documents.models import AIJob, Document
+from documents.models import AIJob
 from documents.services import apply_operation, get_or_load_document_rga
 
 logger = logging.getLogger(__name__)
@@ -38,11 +36,13 @@ logger = logging.getLogger(__name__)
 
 class AnchorDeletedError(Exception):
     """Raised when an anchor character has been deleted by a human collaborator."""
+
     pass
 
 
 class JobCancelledError(Exception):
     """Raised when the AI job is cancelled mid-execution."""
+
     pass
 
 
@@ -183,7 +183,9 @@ class AIPeer:
             sanitized_target = sanitize_document_text(target_text)
 
             if kind == "rewrite":
-                prompt = template.format(instruction=instruction or "Make it better", text=sanitized_target)
+                prompt = template.format(
+                    instruction=instruction or "Make it better", text=sanitized_target
+                )
             elif kind in ("grammar", "shorten", "continue"):
                 prompt = template.format(text=sanitized_target)
             else:
@@ -265,9 +267,7 @@ class AIPeer:
         and publish them to both the database and live broadcast channels.
         """
         rga = get_or_load_document_rga(self.doc_id)
-        start_pos, end_pos, current_slice = self.resolve_anchor_range(
-            rga, start_anchor, end_anchor
-        )
+        start_pos, end_pos, current_slice = self.resolve_anchor_range(rga, start_anchor, end_anchor)
 
         matcher = SequenceMatcher(None, current_slice, replacement_text)
         opcodes = matcher.get_opcodes()

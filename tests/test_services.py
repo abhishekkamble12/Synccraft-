@@ -2,14 +2,12 @@
 Integration tests for domain services (services.py).
 """
 
-import uuid
 import pytest
 from django.contrib.auth.models import User
 
-from crdt.ids import CharId, ROOT
+from crdt.ids import ROOT, CharId
 from crdt.ops import Op
-from crdt.rga import RGA
-from documents.models import Document, Operation, Snapshot
+from documents.models import Document, Operation
 from documents.services import (
     apply_operation,
     generate_revert_operations,

@@ -7,12 +7,12 @@ import pytest
 from channels.testing import WebsocketCommunicator
 from django.contrib.auth.models import User
 
+import documents.services as services
 from config.asgi import application
-from crdt.ids import CharId, ROOT
+from crdt.ids import ROOT, CharId
 from crdt.ops import Op
 from crdt.rga import RGA
 from documents.models import Document, Operation
-import documents.services as services
 
 
 @pytest.mark.asyncio

@@ -7,10 +7,10 @@ import pytest
 from django.contrib.auth.models import User
 from django.test import Client
 
-from crdt.ids import CharId, ROOT
-from crdt.ops import Op
-from documents.models import Document, Operation
 import documents.services as services
+from crdt.ids import ROOT, CharId
+from crdt.ops import Op
+from documents.models import Document
 
 
 @pytest.mark.django_db

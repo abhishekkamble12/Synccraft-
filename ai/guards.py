@@ -2,11 +2,10 @@
 Security guardrails, prompt injection sanitization, rate limiting, and token budgets.
 """
 
-from collections import defaultdict
 import logging
 import re
 import time
-from typing import Any
+from collections import defaultdict
 
 from django.core.cache import cache
 
@@ -45,10 +44,7 @@ def detect_prompt_injection(instruction: str) -> bool:
     """
     Returns True if malicious prompt override attempts are detected.
     """
-    for pattern in INJECTION_SIGNALS:
-        if pattern.search(instruction):
-            return True
-    return False
+    return any(pattern.search(instruction) for pattern in INJECTION_SIGNALS)
 
 
 def validate_input_bounds(
@@ -58,10 +54,16 @@ def validate_input_bounds(
     Validate input text and instructions conform to length and security bounds.
     """
     if len(text) > max_chars:
-        return False, f"Input text length ({len(text)} chars) exceeds maximum allowed ({max_chars} chars)."
+        return (
+            False,
+            f"Input text length ({len(text)} chars) exceeds maximum allowed ({max_chars} chars).",
+        )
 
     if len(instruction) > 2000:
-        return False, f"Instruction length ({len(instruction)} chars) exceeds maximum allowed (2000 chars)."
+        return (
+            False,
+            f"Instruction length ({len(instruction)} chars) exceeds maximum allowed (2000 chars).",
+        )
 
     if detect_prompt_injection(instruction):
         logger.warning("Potential prompt injection pattern detected in user instruction.")

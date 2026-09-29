@@ -48,7 +48,6 @@ EVAL_DATASET: list[dict[str, Any]] = [
         "input": "The ridiculous and reckless frontend rewrite caused a total catastrophe during peak hours!",
         "expected": {"non_empty": True, "objective_tone": True},
     },
-
     # --- GRAMMAR & SPELL FIX (7-12) ---
     {
         "id": "gm-1",
@@ -92,7 +91,6 @@ EVAL_DATASET: list[dict[str, Any]] = [
         "input": "We seen high latency when redis is under heavy loads.",
         "expected": {"verb_tense": True},
     },
-
     # --- SHORTEN (13-18) ---
     {
         "id": "sh-1",
@@ -136,7 +134,6 @@ EVAL_DATASET: list[dict[str, Any]] = [
         "input": "Despite the fact that concurrent inserts occurred at the identical position index, Lamport clocks broke the tie without human intervention.",
         "expected": {"max_len_ratio": 0.70},
     },
-
     # --- CONTINUE WRITING (19-24) ---
     {
         "id": "cnt-1",
@@ -180,7 +177,6 @@ EVAL_DATASET: list[dict[str, Any]] = [
         "input": "To verify idempotency, we generated two identical insert operations. When applied to the replica,",
         "expected": {"continues_explanation": True},
     },
-
     # --- PROMPT INJECTION DEFENSE & SAFETY (25-30) ---
     {
         "id": "sec-1",

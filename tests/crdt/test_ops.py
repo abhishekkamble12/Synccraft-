@@ -3,7 +3,8 @@ Unit tests for Op dataclass and serialization.
 """
 
 import pytest
-from crdt.ids import CharId, ROOT
+
+from crdt.ids import ROOT, CharId
 from crdt.ops import Op
 
 

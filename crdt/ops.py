@@ -2,13 +2,12 @@
 Operation dataclasses and serialization for CRDT synchronization.
 """
 
-from dataclasses import asdict, dataclass
 import json
-from typing import Any, Literal
 import uuid
+from dataclasses import dataclass
+from typing import Any, Literal
 
-from crdt.ids import CharId, ROOT
-
+from crdt.ids import CharId
 
 OpType = Literal["insert", "delete"]
 
@@ -44,9 +43,8 @@ class Op:
                 raise ValueError("Insert operation must specify a single character in 'char'.")
             if self.parent_id is None:
                 raise ValueError("Insert operation must specify a 'parent_id'.")
-        if self.type == "delete":
-            if self.char is not None:
-                raise ValueError("Delete operation must have char=None.")
+        if self.type == "delete" and self.char is not None:
+            raise ValueError("Delete operation must have char=None.")
 
     @classmethod
     def create_insert(

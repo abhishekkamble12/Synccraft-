@@ -4,7 +4,7 @@ Test vector verification test runner in Python.
 
 import json
 from pathlib import Path
-import pytest
+
 from crdt.ops import Op
 from crdt.rga import RGA
 
@@ -16,13 +16,14 @@ def test_python_vector_verification() -> None:
     if not vector_files:
         # If not yet generated, generate now
         from tests.vectors.generate_vectors import main
+
         main()
         vector_files = list(VECTORS_DIR.glob("*.json"))
 
     assert len(vector_files) > 0
 
     for vf in vector_files:
-        with open(vf, "r", encoding="utf-8") as f:
+        with open(vf, encoding="utf-8") as f:
             data = json.load(f)
 
         replica = RGA(site_id="verifier")

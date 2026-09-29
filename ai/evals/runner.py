@@ -9,7 +9,6 @@ from typing import Any
 from ai.client import BaseLLMClient, FakeLLMClient
 from ai.evals.dataset import EVAL_DATASET
 from ai.guards import (
-    detect_prompt_injection,
     sanitize_document_text,
     validate_input_bounds,
     validate_output_bounds,
@@ -41,7 +40,9 @@ async def run_evaluation(
         # 1. Guardrail Validation Check
         valid, err = validate_input_bounds(inp, instruction)
         if not valid:
-            if item.get("expected", {}).get("blocks_or_defends") or item.get("expected", {}).get("rejects_excess_length"):
+            if item.get("expected", {}).get("blocks_or_defends") or item.get("expected", {}).get(
+                "rejects_excess_length"
+            ):
                 passed += 1
                 security_blocks += 1
             else:
@@ -50,10 +51,12 @@ async def run_evaluation(
 
         # 2. Sanitization
         sanitized = sanitize_document_text(inp)
-        if item.get("expected", {}).get("sanitizes_delimiters"):
-            if "&lt;/document_text&gt;" in sanitized:
-                passed += 1
-                continue
+        if (
+            item.get("expected", {}).get("sanitizes_delimiters")
+            and "&lt;/document_text&gt;" in sanitized
+        ):
+            passed += 1
+            continue
 
         # 3. Prompt Execution
         prompt_key = f"{kind}_v1"

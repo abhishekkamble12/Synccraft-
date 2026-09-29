@@ -3,24 +3,24 @@ Integration and Concurrency Tests for AI as a CRDT Peer (Phase 8 & Phase 9).
 """
 
 import asyncio
-from typing import AsyncIterator
+from collections.abc import AsyncIterator
+
 import pytest
 from django.contrib.auth.models import User
 
-from ai.agent_peer import AIPeer, AnchorDeletedError, JobCancelledError
+import documents.services as services
+from ai.agent_peer import AIPeer
 from ai.client import BaseLLMClient, FakeLLMClient
 from ai.guards import (
-    check_rate_limit,
     detect_prompt_injection,
     validate_input_bounds,
     validate_output_bounds,
 )
-from ai.tasks import summarize_missed_edits_task, suggestion_task
-from crdt.ids import CharId, ROOT
+from ai.tasks import suggestion_task
+from crdt.ids import ROOT, CharId
 from crdt.ops import Op
 from crdt.rga import RGA
 from documents.models import AIJob, Document, Operation, Suggestion
-import documents.services as services
 
 
 class SlowMockLLMClient(BaseLLMClient):
@@ -52,7 +52,7 @@ async def test_ai_peer_rewrite_applies_crdt_operations() -> None:
     doc = await Document.objects.acreate(title="AI Test Doc", owner=user)
 
     # 1. Human types initial sentence: "Initial draft text"
-    rga = services.get_or_load_document_rga(doc.id)
+    services.get_or_load_document_rga(doc.id)
     text = "Initial draft text"
     parent = ROOT
     for i, ch in enumerate(text, start=1):
@@ -115,8 +115,12 @@ async def test_ai_and_human_concurrent_edits_converge() -> None:
     )
 
     # Setup replicas
-    replica_a = RGA.from_dict(services.get_or_load_document_rga(doc.id).to_dict(), site_id="replica_a")
-    replica_b = RGA.from_dict(services.get_or_load_document_rga(doc.id).to_dict(), site_id="replica_b")
+    replica_a = RGA.from_dict(
+        services.get_or_load_document_rga(doc.id).to_dict(), site_id="replica_a"
+    )
+    replica_b = RGA.from_dict(
+        services.get_or_load_document_rga(doc.id).to_dict(), site_id="replica_b"
+    )
 
     # AI will rewrite "The cat jumps" -> "The cat leaps gracefully"
     ai_client = FakeLLMClient(canned_response="The cat leaps gracefully")
@@ -126,11 +130,9 @@ async def test_ai_and_human_concurrent_edits_converge() -> None:
     ai_task = peer.execute_task(kind="rewrite")
 
     # 2. Concurrently, Human A inserts "cool " at position 4 ("The cool cat jumps")
-    cid_a1 = CharId(100, "replica_a")
     op_human_a = replica_a.local_insert(4, "!")
 
     # 3. Concurrently, Human B inserts " black" at position 7 ("The cat black jumps")
-    cid_b1 = CharId(200, "replica_b")
     op_human_b = replica_b.local_insert(7, "*")
 
     # Wait for AI to finish
@@ -141,7 +143,13 @@ async def test_ai_and_human_concurrent_edits_converge() -> None:
     services.apply_operation(doc.id, op_human_b, user=user)
 
     # Fetch all operations from the document and apply across all replicas
-    all_ops_qs = await Operation.objects.filter(document_id=doc.id).order_by("server_seq").afull() if hasattr(Operation.objects, "afull") else [op async for op in Operation.objects.filter(document_id=doc.id).order_by("server_seq")]
+    all_ops_qs = (
+        await Operation.objects.filter(document_id=doc.id).order_by("server_seq").afull()
+        if hasattr(Operation.objects, "afull")
+        else [
+            op async for op in Operation.objects.filter(document_id=doc.id).order_by("server_seq")
+        ]
+    )
 
     for op_rec in all_ops_qs:
         op = Op.from_dict(op_rec.payload)

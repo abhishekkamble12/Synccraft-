@@ -7,7 +7,7 @@ from channels.testing import WebsocketCommunicator
 from django.contrib.auth.models import User
 
 from config.asgi import application
-from crdt.ids import CharId, ROOT
+from crdt.ids import ROOT, CharId
 from crdt.ops import Op
 from documents.models import Document
 

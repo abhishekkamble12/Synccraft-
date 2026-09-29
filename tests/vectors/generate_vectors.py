@@ -6,13 +6,12 @@ them as structured JSON vectors for consumption by both pytest and node --test.
 """
 
 import json
-from pathlib import Path
 import random
+from pathlib import Path
 from typing import Any
 
 from crdt.ops import Op
 from crdt.rga import RGA
-
 
 VECTORS_DIR = Path(__file__).resolve().parent
 

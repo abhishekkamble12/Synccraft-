@@ -3,19 +3,17 @@ Core domain services for CRDT document loading, operation application,
 snapshotting, sync catch-up, and history replay/revert.
 """
 
-from difflib import SequenceMatcher
 import threading
-from typing import Any
 import uuid
+from difflib import SequenceMatcher
+from typing import Any
 
 from django.contrib.auth.models import User
 from django.db import transaction
 
-from crdt.clock import LamportClock
 from crdt.ops import Op
 from crdt.rga import RGA
 from documents.models import Document, Operation, Snapshot
-
 
 # In-memory document replica cache and per-document locking mechanism
 _cache_lock = threading.Lock()
@@ -53,10 +51,9 @@ def get_or_load_document_rga(doc_id: uuid.UUID) -> RGA:
             start_seq = 0
 
         # 2. Replay subsequent operations
-        pending_ops = (
-            Operation.objects.filter(document_id=doc_id, server_seq__gt=start_seq)
-            .order_by("server_seq")
-        )
+        pending_ops = Operation.objects.filter(
+            document_id=doc_id, server_seq__gt=start_seq
+        ).order_by("server_seq")
 
         for op_record in pending_ops:
             op = Op.from_dict(op_record.payload)
@@ -78,46 +75,45 @@ def apply_operation(
         (server_seq: int, newly_applied: bool)
     """
     doc_lock = _get_doc_lock(doc_id)
-    with doc_lock:
-        with transaction.atomic():
-            # Lock the document row to serialize server_seq assignment
-            doc = Document.objects.select_for_update().get(id=doc_id)
+    with doc_lock, transaction.atomic():
+        # Lock the document row to serialize server_seq assignment
+        doc = Document.objects.select_for_update().get(id=doc_id)
 
-            # Idempotency check
-            existing_op = Operation.objects.filter(op_id=op.op_id).first()
-            if existing_op is not None:
-                return existing_op.server_seq, False
+        # Idempotency check
+        existing_op = Operation.objects.filter(op_id=op.op_id).first()
+        if existing_op is not None:
+            return existing_op.server_seq, False
 
-            # Increment sequence number
-            doc.head_seq += 1
-            server_seq = doc.head_seq
-            doc.save(update_fields=["head_seq", "updated_at"])
+        # Increment sequence number
+        doc.head_seq += 1
+        server_seq = doc.head_seq
+        doc.save(update_fields=["head_seq", "updated_at"])
 
-            # Persist Operation record
-            Operation.objects.create(
+        # Persist Operation record
+        Operation.objects.create(
+            document=doc,
+            server_seq=server_seq,
+            op_id=op.op_id,
+            site_id=op.site_id,
+            lamport=op.lamport,
+            type=op.type,
+            payload=op.to_dict(),
+            user=user,
+        )
+
+        # Apply to in-memory CRDT cache
+        rga = get_or_load_document_rga(doc_id)
+        rga.apply(op)
+
+        # Periodic snapshotting (every 500 operations)
+        if server_seq % 500 == 0:
+            Snapshot.objects.create(
                 document=doc,
                 server_seq=server_seq,
-                op_id=op.op_id,
-                site_id=op.site_id,
-                lamport=op.lamport,
-                type=op.type,
-                payload=op.to_dict(),
-                user=user,
+                state=rga.to_dict(),
             )
 
-            # Apply to in-memory CRDT cache
-            rga = get_or_load_document_rga(doc_id)
-            rga.apply(op)
-
-            # Periodic snapshotting (every 500 operations)
-            if server_seq % 500 == 0:
-                Snapshot.objects.create(
-                    document=doc,
-                    server_seq=server_seq,
-                    state=rga.to_dict(),
-                )
-
-            return server_seq, True
+        return server_seq, True
 
 
 def sync_client_state(
@@ -141,13 +137,11 @@ def sync_client_state(
         acked_op_ids.append(op.op_id)
 
     # 2. Fetch all missed operations since the client's last acknowledged sequence number
-    missed_ops_qs = (
-        Operation.objects.filter(document_id=doc_id, server_seq__gt=last_seq)
-        .order_by("server_seq")
+    missed_ops_qs = Operation.objects.filter(document_id=doc_id, server_seq__gt=last_seq).order_by(
+        "server_seq"
     )
     missed_ops = [
-        {"seq": op_record.server_seq, "op": op_record.payload}
-        for op_record in missed_ops_qs
+        {"seq": op_record.server_seq, "op": op_record.payload} for op_record in missed_ops_qs
     ]
 
     # Refresh head sequence
@@ -174,12 +168,9 @@ def reconstruct_state_at_seq(doc_id: uuid.UUID, target_seq: int) -> tuple[RGA, s
         start_seq = 0
 
     # 2. Replay operations up to target_seq
-    ops = (
-        Operation.objects.filter(
-            document_id=doc_id, server_seq__gt=start_seq, server_seq__lte=target_seq
-        )
-        .order_by("server_seq")
-    )
+    ops = Operation.objects.filter(
+        document_id=doc_id, server_seq__gt=start_seq, server_seq__lte=target_seq
+    ).order_by("server_seq")
 
     for op_rec in ops:
         op = Op.from_dict(op_rec.payload)

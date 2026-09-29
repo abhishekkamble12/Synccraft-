@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from crdt.clock import LamportClock
-from crdt.ids import CharId, ROOT
+from crdt.ids import ROOT, CharId
 from crdt.ops import Op
 
 

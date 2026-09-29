@@ -3,6 +3,7 @@ Django admin registrations for documents and sync engine models.
 """
 
 from django.contrib import admin
+
 from documents.models import (
     AIJob,
     Collaborator,
@@ -30,10 +31,28 @@ class CollaboratorAdmin(admin.ModelAdmin):
 
 @admin.register(Operation)
 class OperationAdmin(admin.ModelAdmin):
-    list_display = ("server_seq", "document", "type", "op_id", "site_id", "lamport", "user", "created_at")
+    list_display = (
+        "server_seq",
+        "document",
+        "type",
+        "op_id",
+        "site_id",
+        "lamport",
+        "user",
+        "created_at",
+    )
     list_filter = ("type", "site_id")
     search_fields = ("op_id", "document__title", "site_id")
-    readonly_fields = ("id", "server_seq", "op_id", "site_id", "lamport", "type", "payload", "created_at")
+    readonly_fields = (
+        "id",
+        "server_seq",
+        "op_id",
+        "site_id",
+        "lamport",
+        "type",
+        "payload",
+        "created_at",
+    )
 
 
 @admin.register(Snapshot)

@@ -2,8 +2,11 @@
 Unit tests for CharId and ROOT sentinel.
 """
 
+import dataclasses
+
 import pytest
-from crdt.ids import CharId, ROOT
+
+from crdt.ids import ROOT, CharId
 
 
 def test_root_sentinel() -> None:
@@ -20,7 +23,7 @@ def test_char_id_creation_and_fields() -> None:
 
 def test_char_id_immutability() -> None:
     cid = CharId(clock=1, site_id="a")
-    with pytest.raises(Exception):
+    with pytest.raises(dataclasses.FrozenInstanceError):
         cid.clock = 2  # type: ignore[misc]
 
 

@@ -12,9 +12,9 @@ Exports:
 """
 
 from crdt.clock import LamportClock
-from crdt.ids import CharId, ROOT
+from crdt.ids import ROOT, CharId
 from crdt.ops import Op
-from crdt.rga import Node, RGA
+from crdt.rga import RGA, Node
 
 __all__ = [
     "LamportClock",

@@ -5,19 +5,16 @@ Celery background tasks for AI co-authoring, summarization, and vector indexing.
 import asyncio
 import logging
 import os
-import time
 import uuid
 
 from asgiref.sync import async_to_sync
 from celery import shared_task
 from channels.layers import get_channel_layer
-from django.contrib.auth.models import User
 
 from ai.agent_peer import AIPeer
 from ai.client import FakeLLMClient, OpenAICompatibleLLMClient
 from ai.prompts import PROMPTS, SYSTEM_PROMPT_COAUTHOR, SYSTEM_PROMPT_SUMMARY
-from crdt.ops import Op
-from documents.models import AIJob, DocChunk, Document, Operation, Suggestion
+from documents.models import AIJob, DocChunk, Operation, Suggestion
 from documents.services import get_or_load_document_rga, reconstruct_state_at_seq
 
 logger = logging.getLogger(__name__)
@@ -81,7 +78,9 @@ def summarize_missed_edits_task(
 
     # Find authors who edited in this window
     ops = (
-        Operation.objects.filter(document_id=doc_id, server_seq__gt=from_seq, server_seq__lte=to_seq)
+        Operation.objects.filter(
+            document_id=doc_id, server_seq__gt=from_seq, server_seq__lte=to_seq
+        )
         .select_related("user")
         .all()
     )

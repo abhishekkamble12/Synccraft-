@@ -3,6 +3,7 @@ WebSocket routing configuration for Channels.
 """
 
 from django.urls import re_path
+
 from documents.consumers import DocumentConsumer
 
 websocket_urlpatterns = [

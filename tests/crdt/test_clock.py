@@ -3,7 +3,9 @@ Unit tests for LamportClock.
 """
 
 from concurrent.futures import ThreadPoolExecutor
+
 import pytest
+
 from crdt.clock import LamportClock
 
 

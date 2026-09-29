@@ -9,8 +9,6 @@ identical final text and identical internal linked-list sequences.
 
 import itertools
 import random
-from typing import list
-import pytest
 
 from crdt.ops import Op
 from crdt.rga import RGA

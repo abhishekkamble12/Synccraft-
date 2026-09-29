@@ -2,10 +2,6 @@
 Unit tests for RGA (Replicated Growable Array) CRDT.
 """
 
-import pytest
-from crdt.clock import LamportClock
-from crdt.ids import CharId, ROOT
-from crdt.ops import Op
 from crdt.rga import RGA
 
 

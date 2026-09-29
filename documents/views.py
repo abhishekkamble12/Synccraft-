@@ -2,16 +2,15 @@
 Django views for document management, collaborative editor, and user authentication.
 """
 
-from typing import Any
 import uuid
+from typing import Any
 
 from django.contrib.auth import login
-from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db.models import Q
-from django.http import HttpRequest, HttpResponse, JsonResponse
-from django.shortcuts import get_object_or_404, redirect, render
+from django.http import HttpRequest, HttpResponse
+from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse_lazy
 from django.views import View
 from django.views.generic import CreateView, DetailView, ListView
@@ -42,9 +41,7 @@ class DocumentListView(LoginRequiredMixin, ListView):
 
     def get_queryset(self) -> Any:
         user = self.request.user
-        return Document.objects.filter(
-            Q(owner=user) | Q(collaborators__user=user)
-        ).distinct()
+        return Document.objects.filter(Q(owner=user) | Q(collaborators__user=user)).distinct()
 
 
 class DocumentCreateView(LoginRequiredMixin, View):

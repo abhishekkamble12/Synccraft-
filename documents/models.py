@@ -2,7 +2,6 @@
 Database models for documents, operations, snapshots, collaborators, and AI jobs.
 """
 
-from typing import Any
 import uuid
 
 from django.contrib.auth.models import User

@@ -2,10 +2,12 @@
 AI co-author and LLM streaming client interface.
 """
 
-from abc import ABC, abstractmethod
 import asyncio
+import json
 import os
-from typing import AsyncIterator
+from abc import ABC, abstractmethod
+from collections.abc import AsyncIterator
+
 import httpx
 
 
@@ -39,7 +41,9 @@ class FakeLLMClient(BaseLLMClient):
     without external network dependencies.
     """
 
-    def __init__(self, canned_response: str = "This is a polished and concise rewritten text.") -> None:
+    def __init__(
+        self, canned_response: str = "This is a polished and concise rewritten text."
+    ) -> None:
         self.canned_response = canned_response
         self.stream_delay = 0.01  # Delay between token chunks
 
@@ -108,20 +112,21 @@ class OpenAICompatibleLLMClient(BaseLLMClient):
             "stream": True,
         }
 
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            async with client.stream(
+        async with (
+            httpx.AsyncClient(timeout=30.0) as client,
+            client.stream(
                 "POST", f"{self.base_url}/chat/completions", headers=headers, json=payload
-            ) as response:
-                async for line in response.aiter_lines():
-                    if line.startswith("data: ") and not line.startswith("data: [DONE]"):
-                        import json
-                        try:
-                            data = json.loads(line[6:])
-                            delta = data["choices"][0]["delta"].get("content", "")
-                            if delta:
-                                yield delta
-                        except Exception:
-                            continue
+            ) as response,
+        ):
+            async for line in response.aiter_lines():
+                if line.startswith("data: ") and not line.startswith("data: [DONE]"):
+                    try:
+                        data = json.loads(line[6:])
+                        delta = data["choices"][0]["delta"].get("content", "")
+                        if delta:
+                            yield delta
+                    except Exception:
+                        continue
 
     async def generate_text(
         self,

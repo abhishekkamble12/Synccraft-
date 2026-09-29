@@ -2,15 +2,15 @@
 REST API endpoints for document history, state-at-sequence time travel, and non-destructive revert.
 """
 
-from typing import Any
 import uuid
+from typing import Any
 
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.http import HttpRequest, JsonResponse
 from django.shortcuts import get_object_or_404
 from django.views import View
-from django.contrib.auth.mixins import LoginRequiredMixin
-from asgiref.sync import async_to_sync
-from channels.layers import get_channel_layer
 
 from documents.models import Document, Operation
 from documents.services import (
@@ -31,7 +31,9 @@ class DocumentHistoryApiView(LoginRequiredMixin, View):
         doc = get_object_or_404(Document, id=doc_id)
 
         # Fetch operations
-        ops_qs = Operation.objects.filter(document=doc).select_related("user").order_by("server_seq")
+        ops_qs = (
+            Operation.objects.filter(document=doc).select_related("user").order_by("server_seq")
+        )
 
         history_entries: list[dict[str, Any]] = []
         for op in ops_qs:
