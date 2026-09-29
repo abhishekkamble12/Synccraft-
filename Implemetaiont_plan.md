@@ -134,6 +134,7 @@ flowchart TB
 ```python
 # documents/models.py
 
+
 class Document(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid4)
     title = models.CharField(max_length=255)
@@ -141,12 +142,17 @@ class Document(models.Model):
     head_seq = models.BigIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
 
+
 class Collaborator(models.Model):
     document = models.ForeignKey(Document, on_delete=models.CASCADE)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
-    role = models.CharField(choices=[("owner","Owner"),("editor","Editor"),("viewer","Viewer")])
+    role = models.CharField(
+        choices=[("owner", "Owner"), ("editor", "Editor"), ("viewer", "Viewer")]
+    )
+
     class Meta:
         unique_together = ("document", "user")
+
 
 class Operation(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid4)
@@ -155,13 +161,15 @@ class Operation(models.Model):
     op_id = models.CharField(max_length=128, unique=True)  # idempotency key
     site_id = models.CharField(max_length=64)
     lamport = models.BigIntegerField()
-    type = models.CharField(choices=[("insert","Insert"),("delete","Delete")])
+    type = models.CharField(choices=[("insert", "Insert"), ("delete", "Delete")])
     payload = models.JSONField()  # full op as JSON
     user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
     class Meta:
         indexes = [models.Index(fields=["document", "server_seq"])]
         unique_together = ("document", "server_seq")
+
 
 class Snapshot(models.Model):
     document = models.ForeignKey(Document, on_delete=models.CASCADE)
