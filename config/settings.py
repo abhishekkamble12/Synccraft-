@@ -30,6 +30,7 @@ INSTALLED_APPS = [
     "channels",
     # Local apps
     "documents.apps.DocumentsConfig",
+    "ai.apps.AiConfig",
 ]
 
 MIDDLEWARE = [

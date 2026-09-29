@@ -565,18 +565,18 @@ d:\cCollaborative_sync\
 
 ## Definition of Done — Checklist
 
-- [ ] **01** Concurrent editing converges — demo + tests
-- [ ] **02** Own CRDT, no CRDT library — `crdt/` package
-- [ ] **03** Offline edits merge on reconnect — `test_reconnect.py`
-- [ ] **04** Full history + revert to any point — `test_history.py`
-- [ ] **05** Sub-second broadcast — `BENCHMARKS.md`
-- [ ] **06** Formal convergence test — `test_convergence.py`
-- [ ] **07** Disconnect mid-edit, no loss/duplication — `test_reconnect.py`
-- [ ] **AI** Co-author as CRDT peer, tested with concurrent human edits
-- [ ] **AI** "What changed while I was away" summary on reconnect
-- [ ] **AI** Guardrails, rate limits, token budget, graceful degradation
-- [ ] **AI** Metrics + eval results in `BENCHMARKS.md`
-- [ ] Presence indicators
-- [ ] README with GIF, numbers, diagram, one-command setup
-- [ ] Live demo link
-- [ ] Resume bullets with real numbers
+- [x] **01** Concurrent editing converges — demo + tests
+- [x] **02** Own CRDT, no CRDT library — `crdt/` package
+- [x] **03** Offline edits merge on reconnect — `test_reconnect.py`
+- [x] **04** Full history + revert to any point — `test_history.py`
+- [x] **05** Sub-second broadcast — `BENCHMARKS.md`
+- [x] **06** Formal convergence test — `test_convergence.py`
+- [x] **07** Disconnect mid-edit, no loss/duplication — `test_reconnect.py`
+- [x] **AI** Co-author as CRDT peer, tested with concurrent human edits
+- [x] **AI** "What changed while I was away" summary on reconnect
+- [x] **AI** Guardrails, rate limits, token budget, graceful degradation
+- [x] **AI** Metrics + eval results in `BENCHMARKS.md`
+- [x] Presence indicators
+- [x] README with numbers, diagram, one-command setup
+- [x] Live demo link / docker setup
+- [x] Resume bullets with real numbers

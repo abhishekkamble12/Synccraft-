@@ -312,3 +312,106 @@ body {
   color: #fff;
   white-space: nowrap;
 }
+
+/* AI Co-Author & Suggestion Styling */
+.ai-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: rgba(139, 92, 246, 0.15);
+  border: 1px solid #8b5cf6;
+  color: #c4b5fd;
+  padding: 0.25rem 0.65rem;
+  border-radius: 9999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  animation: pulse-glow 2s infinite ease-in-out;
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 5px rgba(139, 92, 246, 0.3); }
+  50% { box-shadow: 0 0 15px rgba(139, 92, 246, 0.7); }
+}
+
+.floating-ai-toolbar {
+  position: absolute;
+  z-index: 50;
+  background: var(--bg-secondary);
+  border: 1px solid var(--accent);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+  border-radius: 0.5rem;
+  padding: 0.35rem 0.5rem;
+  display: none;
+  align-items: center;
+  gap: 0.35rem;
+  transform: translate(-50%, -100%);
+  margin-top: -8px;
+}
+
+.floating-ai-toolbar button {
+  background: var(--bg-tertiary);
+  color: var(--text-main);
+  border: 1px solid var(--border);
+  padding: 0.3rem 0.6rem;
+  border-radius: 0.35rem;
+  font-size: 0.75rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  transition: all 0.15s;
+}
+
+.floating-ai-toolbar button:hover {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+.suggestion-card {
+  position: fixed;
+  bottom: 4rem;
+  right: 2rem;
+  width: 380px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--accent);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+  z-index: 70;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.suggestion-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #c4b5fd;
+}
+
+.suggestion-body {
+  font-size: 0.85rem;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 0.375rem;
+  padding: 0.5rem;
+  max-height: 120px;
+  overflow-y: auto;
+  color: var(--text-main);
+}
+
+.suggestion-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.btn-xs {
+  padding: 0.2rem 0.45rem;
+  font-size: 0.75rem;
+}
+

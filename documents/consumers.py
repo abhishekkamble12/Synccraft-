@@ -2,6 +2,7 @@
 WebSocket consumer for real-time document synchronization and presence.
 """
 
+import asyncio
 from typing import Any
 import uuid
 
@@ -9,8 +10,11 @@ from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
 from django.contrib.auth.models import User
 
+from ai.agent_peer import AIPeer
+from ai.guards import check_rate_limit, check_and_increment_token_budget
+from ai.tasks import rewrite_task, summarize_missed_edits_task, suggestion_task
 from crdt.ops import Op
-from documents.models import Collaborator, Document
+from documents.models import AIJob, Collaborator, Document, Suggestion
 from documents.services import (
     apply_operation,
     get_or_load_document_rga,
@@ -93,6 +97,14 @@ class DocumentConsumer(AsyncJsonWebsocketConsumer):
             await self._handle_sync_message(content)
         elif msg_type == "presence":
             await self._handle_presence_message(content)
+        elif msg_type == "ai_request":
+            await self._handle_ai_request_message(content)
+        elif msg_type == "ai_cancel":
+            await self._handle_ai_cancel_message(content)
+        elif msg_type == "suggestion_accept":
+            await self._handle_suggestion_accept(content)
+        elif msg_type == "suggestion_reject":
+            await self._handle_suggestion_reject(content)
         else:
             await self.send_json(
                 {"type": "error", "code": "unknown_message_type", "message": f"Unknown type: {msg_type}"}
@@ -211,6 +223,127 @@ class DocumentConsumer(AsyncJsonWebsocketConsumer):
             },
         )
 
+    async def _handle_ai_request_message(self, content: dict[str, Any]) -> None:
+        if self.role == "viewer":
+            await self.send_json(
+                {"type": "error", "code": "forbidden", "message": "Viewers cannot request AI edits."}
+            )
+            return
+
+        user_key = str(self.user.id) if (self.user and self.user.is_authenticated) else self.channel_name
+        allowed, remaining = check_rate_limit(user_key)
+        if not allowed:
+            await self.send_json(
+                {
+                    "type": "error",
+                    "code": "rate_limited",
+                    "message": "AI request rate limit reached. Please wait before submitting another request.",
+                }
+            )
+            return
+
+        budget_ok = check_and_increment_token_budget(user_key, estimated_tokens=1000)
+        if not budget_ok:
+            await self.send_json(
+                {
+                    "type": "error",
+                    "code": "token_budget_exceeded",
+                    "message": "Daily AI token budget limit reached.",
+                }
+            )
+            return
+
+        kind = content.get("kind", "rewrite")
+        anchor_start = content.get("anchor_start")
+        anchor_end = content.get("anchor_end")
+        instruction = content.get("instruction", "")
+
+        job = await database_sync_to_async(self._create_ai_job)(
+            kind=kind,
+            anchor_start=anchor_start,
+            anchor_end=anchor_end,
+            instruction=instruction,
+        )
+
+        # Trigger background execution: prefer Celery, fall back to in-process async
+        if kind == "suggest":
+            try:
+                suggestion_task.delay(str(job.id))
+            except Exception:
+                asyncio.create_task(database_sync_to_async(suggestion_task)(str(job.id)))
+        else:
+            try:
+                rewrite_task.delay(str(job.id))
+            except Exception:
+                asyncio.create_task(database_sync_to_async(rewrite_task)(str(job.id)))
+
+        await self.send_json(
+            {
+                "type": "ai_status",
+                "job_id": str(job.id),
+                "status": "queued",
+                "kind": kind,
+            }
+        )
+
+    async def _handle_ai_cancel_message(self, content: dict[str, Any]) -> None:
+        job_id = content.get("job_id")
+        if not job_id:
+            return
+
+        await database_sync_to_async(self._cancel_ai_job)(job_id)
+
+        await self.channel_layer.group_send(
+            self.group_name,
+            {
+                "type": "doc.presence",
+                "data": {
+                    "type": "ai_status",
+                    "job_id": job_id,
+                    "status": "cancelled",
+                    "message": "Cancelled by user",
+                },
+                "sender_channel": self.channel_name,
+            },
+        )
+
+    async def _handle_suggestion_accept(self, content: dict[str, Any]) -> None:
+        if self.role == "viewer":
+            await self.send_json({"type": "error", "code": "forbidden", "message": "Viewer cannot accept suggestions."})
+            return
+
+        suggestion_id = content.get("suggestion_id")
+        applied = await database_sync_to_async(self._apply_suggestion)(suggestion_id)
+        if applied:
+            await self.channel_layer.group_send(
+                self.group_name,
+                {
+                    "type": "doc.presence",
+                    "data": {
+                        "type": "suggestion_update",
+                        "suggestion_id": suggestion_id,
+                        "status": "accepted",
+                    },
+                    "sender_channel": self.channel_name,
+                },
+            )
+
+    async def _handle_suggestion_reject(self, content: dict[str, Any]) -> None:
+        suggestion_id = content.get("suggestion_id")
+        await database_sync_to_async(self._reject_suggestion)(suggestion_id)
+        await self.channel_layer.group_send(
+            self.group_name,
+            {
+                "type": "doc.presence",
+                "data": {
+                    "type": "suggestion_update",
+                    "suggestion_id": suggestion_id,
+                    "status": "rejected",
+                },
+                "sender_channel": self.channel_name,
+            },
+        )
+
     # -------------------------------------------------------------------------
     # Channel Layer Group Event Receivers
     # -------------------------------------------------------------------------
@@ -235,6 +368,50 @@ class DocumentConsumer(AsyncJsonWebsocketConsumer):
     # -------------------------------------------------------------------------
 
     @database_sync_to_async
+    def _create_ai_job(
+        self, kind: str, anchor_start: str | None, anchor_end: str | None, instruction: str
+    ) -> Any:
+        user = self.user if self.user and self.user.is_authenticated else User.objects.first()
+        if not user:
+            user = User.objects.create(username="anonymous_ai_user")
+        return AIJob.objects.create(
+            document_id=self.doc_id,
+            user=user,
+            kind=kind,
+            anchor_start=anchor_start or "",
+            anchor_end=anchor_end or "",
+            instruction=instruction,
+            status="queued",
+        )
+
+    @database_sync_to_async
+    def _cancel_ai_job(self, job_id: str) -> None:
+        AIJob.objects.filter(id=job_id).update(status="cancelled", error_message="Cancelled by user")
+
+    @database_sync_to_async
+    def _apply_suggestion(self, suggestion_id: str) -> bool:
+        sugg = Suggestion.objects.filter(id=suggestion_id, status="open").first()
+        if not sugg or not self.doc_id:
+            return False
+        peer = AIPeer(
+            doc_id=self.doc_id,
+            job_id=sugg.id,
+            user=self.user if self.user and self.user.is_authenticated else None,
+        )
+        peer.apply_text_replacement(
+            start_anchor=sugg.anchor_start or None,
+            end_anchor=sugg.anchor_end or None,
+            replacement_text=sugg.proposed_text,
+        )
+        sugg.status = "accepted"
+        sugg.save(update_fields=["status"])
+        return True
+
+    @database_sync_to_async
+    def _reject_suggestion(self, suggestion_id: str) -> None:
+        Suggestion.objects.filter(id=suggestion_id, status="open").update(status="rejected")
+
+    @database_sync_to_async
     def _check_access_permission(self) -> tuple[bool, str]:
         doc = Document.objects.filter(id=self.doc_id).first()
         if doc is None:
@@ -255,6 +432,7 @@ class DocumentConsumer(AsyncJsonWebsocketConsumer):
 
     @database_sync_to_async
     def _get_initial_document_state(self) -> dict[str, Any]:
+        assert self.doc_id is not None
         doc = Document.objects.get(id=self.doc_id)
         rga = get_or_load_document_rga(self.doc_id)
         return {

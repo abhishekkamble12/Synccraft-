@@ -34,3 +34,14 @@
 - **Built:** High-concurrency load testing swarm (`loadtest/swarm.py`) measuring p50/p95/p99 latency with 50, 100, and 200 concurrent clients. Prometheus metrics export on `/metrics` with operations counters, latency histograms, and active connection gauges. Multi-replica Docker Compose setup with Nginx load balancer and 2 Daphne ASGI workers. Comprehensive documentation in `docs/BENCHMARKS.md` and complete portfolio `README.md`.
 - **Broke / Debugged:** Configured Nginx WebSocket reverse proxying with `Upgrade` and `Connection` headers and sticky connection timeout settings to prevent premature connection dropouts.
 - **Learned:** How the Redis channel layer seamlessly routes messages across independent Daphne worker processes to achieve linear horizontal scalability.
+
+## Day 8 — AI Co-Author as a First-Class CRDT Peer
+- **Built:** Autonomous `AIPeer` (`ai/agent_peer.py`) integrating LLM generation as a native CRDT collaborator with its own `site_id` and Lamport clock. Diff-to-Op decomposition transforming streaming LLM tokens into incremental CRDT insert and delete operations broadcast over the Redis channel layer. Celery worker tasks (`ai/tasks.py`) with `rewrite_task`. Concurrency test suite (`tests/test_ai_peer.py`) verifying concurrent human and AI edits converge with zero dropped characters.
+- **Broke / Debugged:** Handled anchor deletion gracefully (`AnchorDeletedError`) if a human user deletes the targeted selection range while the AI is streaming tokens. Implemented mid-stream cancellation with zero orphaned database locks.
+- **Learned:** Why treating AI as an equal peer within the CRDT math model completely eliminates the need for document-level locking during AI generation.
+
+## Day 9 — AI Features, Guardrails & Evals
+- **Built:** "What Changed While I Was Away" feature (`summarize_missed_edits_task`) triggered on client reconnect when missed operations exceed threshold, summarizing changes in 3 bullet points with contributor attribution. Security guardrails (`ai/guards.py`) defending against prompt injections, enforcing delimiter escaping, sliding-window rate limits, and daily token budgets. Suggestion Mode (F3) with interactive Accept/Discard UI. Curated evaluation dataset of 30 test cases (`ai/evals/dataset.py`) and automated scoring harness (`ai/evals/runner.py`). ADR 004 on AI-as-CRDT-Peer.
+- **Broke / Debugged:** Discovered that closing tags (`</document_text>`) inside user-generated documents could cause prompt injection escapes; implemented strict XML escaping for delimiter integrity.
+- **Learned:** How combining prompt injection guardrails with deterministic CRDT operations creates a safe, auditable AI assistant in collaborative systems.
+

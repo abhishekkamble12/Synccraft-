@@ -77,6 +77,10 @@ class SyncClient {
     this.onInitReceived = onInitReceived || (() => {});
     this.onPresenceReceived = onPresenceReceived || (() => {});
     this.onStatusChange = onStatusChange || (() => {});
+    this.onAIStatusReceived = arguments[0].onAIStatusReceived || (() => {});
+    this.onMissedSummaryReceived = arguments[0].onMissedSummaryReceived || (() => {});
+    this.onSuggestionReceived = arguments[0].onSuggestionReceived || (() => {});
+    this.onSuggestionUpdated = arguments[0].onSuggestionUpdated || (() => {});
 
     this.socket = null;
     this.isConnected = false;
@@ -207,8 +211,60 @@ class SyncClient {
       this.onAckReceived(msg, null);
     } else if (type === 'presence' || type === 'presence_leave') {
       this.onPresenceReceived(msg);
+    } else if (type === 'ai_status') {
+      this.onAIStatusReceived(msg);
+    } else if (type === 'missed_summary') {
+      this.onMissedSummaryReceived(msg);
+    } else if (type === 'new_suggestion') {
+      this.onSuggestionReceived(msg);
+    } else if (type === 'suggestion_update') {
+      this.onSuggestionUpdated(msg);
     } else if (type === 'error') {
       console.warn('Server error:', msg);
+    }
+  }
+
+  sendAIRequest(requestData) {
+    if (this.isConnected && this.socket && this.socket.readyState === WebSocket.OPEN) {
+      this.socket.send(
+        JSON.stringify({
+          type: 'ai_request',
+          ...requestData
+        })
+      );
+    }
+  }
+
+  sendAICancel(jobId) {
+    if (this.isConnected && this.socket && this.socket.readyState === WebSocket.OPEN) {
+      this.socket.send(
+        JSON.stringify({
+          type: 'ai_cancel',
+          job_id: jobId
+        })
+      );
+    }
+  }
+
+  sendSuggestionAccept(suggestionId) {
+    if (this.isConnected && this.socket && this.socket.readyState === WebSocket.OPEN) {
+      this.socket.send(
+        JSON.stringify({
+          type: 'suggestion_accept',
+          suggestion_id: suggestionId
+        })
+      );
+    }
+  }
+
+  sendSuggestionReject(suggestionId) {
+    if (this.isConnected && this.socket && this.socket.readyState === WebSocket.OPEN) {
+      this.socket.send(
+        JSON.stringify({
+          type: 'suggestion_reject',
+          suggestion_id: suggestionId
+        })
+      );
     }
   }
 

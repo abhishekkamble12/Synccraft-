@@ -14,6 +14,11 @@
 
     <!-- Actions & Active Collaborators Presence -->
     <div style="display: flex; align-items: center; gap: 1rem;">
+      <div id="aiStatusPill" class="ai-status-pill" style="display: none;">
+        <span id="aiStatusText">AI writing...</span>
+        <button id="cancelAiBtn" class="btn btn-danger btn-xs" style="padding: 0.15rem 0.4rem; font-size: 0.7rem;">Cancel</button>
+      </div>
+
       <button id="historyModalBtn" class="btn btn-secondary" style="padding: 0.35rem 0.75rem;">
         📜 Version History
       </button>
@@ -25,7 +30,16 @@
   </div>
 
   <!-- Text Editor Container -->
-  <div class="editor-container" id="editorContainer">
+  <div class="editor-container" id="editorContainer" style="position: relative;">
+    <!-- Floating AI Context Toolbar for Selected Text -->
+    <div id="floatingAiToolbar" class="floating-ai-toolbar">
+      <button type="button" data-action="rewrite">✨ Rewrite</button>
+      <button type="button" data-action="grammar">✍️ Grammar</button>
+      <button type="button" data-action="shorten">✂️ Shorten</button>
+      <button type="button" data-action="continue">⏩ Continue</button>
+      <button type="button" data-action="suggest">💡 Suggest</button>
+    </div>
+
     <textarea
       id="collaborativeEditor"
       class="editor-textarea"
@@ -88,6 +102,34 @@
       <button id="cancelHistoryBtn" class="btn btn-secondary">Close</button>
       <button id="revertBtn" class="btn btn-danger">⏪ Revert Document to this Version</button>
     </div>
+  </div>
+</div>
+
+<!-- What Changed While You Were Away Modal (Task 9.1 F2) -->
+<div id="missedSummaryModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 110; align-items: center; justify-content: center;">
+  <div style="background: var(--bg-secondary); border: 1px solid var(--accent); border-radius: 0.5rem; width: 90%; max-width: 550px; padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem;">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <h3 style="font-size: 1.15rem; font-weight: 700; color: #c4b5fd;">✨ What Changed While You Were Away</h3>
+      <button id="closeSummaryBtn" class="btn btn-secondary btn-xs" onclick="document.getElementById('missedSummaryModal').style.display='none'">✕</button>
+    </div>
+    <div id="summaryAuthors" style="font-size: 0.8rem; color: var(--text-muted);">Edits made by collaborators</div>
+    <div id="summaryBullets" style="font-size: 0.9rem; line-height: 1.5; white-space: pre-line; background: var(--bg-primary); padding: 0.75rem; border-radius: 0.375rem; border: 1px solid var(--border);"></div>
+    <div style="display: flex; justify-content: flex-end;">
+      <button class="btn btn-secondary" onclick="document.getElementById('missedSummaryModal').style.display='none'">Got It</button>
+    </div>
+  </div>
+</div>
+
+<!-- Suggestion Mode Card (Task 9.4 F3) -->
+<div id="suggestionCard" class="suggestion-card" style="display: none;">
+  <div class="suggestion-header">
+    <span>💡 AI Proposed Suggestion</span>
+    <span id="suggestionAuthor" style="font-size: 0.75rem; color: var(--text-muted);">AI Co-Author</span>
+  </div>
+  <div class="suggestion-body" id="suggestionProposedText"></div>
+  <div class="suggestion-actions">
+    <button id="rejectSuggestionBtn" class="btn btn-secondary btn-xs">Discard</button>
+    <button id="acceptSuggestionBtn" class="btn btn-success btn-xs" style="background: var(--success); color: white;">✓ Accept Edit</button>
   </div>
 </div>
 {% endblock %}

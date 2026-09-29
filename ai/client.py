@@ -13,14 +13,14 @@ class BaseLLMClient(ABC):
     """Abstract LLM Client interface."""
 
     @abstractmethod
-    async def stream_completion(
+    def stream_completion(
         self,
         prompt: str,
         system_prompt: str = "",
         max_tokens: int = 1000,
     ) -> AsyncIterator[str]:
         """Stream generated completion token by token."""
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     async def generate_text(

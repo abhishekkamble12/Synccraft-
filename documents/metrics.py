@@ -40,6 +40,24 @@ if PROMETHEUS_AVAILABLE:
         "collab_snapshots_created_total",
         "Total count of periodic CRDT document snapshots taken.",
     )
+
+    AI_TOKENS_TOTAL = Counter(
+        "ai_tokens_total",
+        "Total LLM tokens consumed by AI co-author.",
+        ["kind"],
+    )
+
+    AI_LATENCY_SECONDS = Histogram(
+        "ai_latency_seconds",
+        "Latency of AI co-author generation tasks.",
+        buckets=(0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0),
+    )
+
+    AI_REQUESTS_TOTAL = Counter(
+        "ai_requests_total",
+        "Total AI requests by kind and status.",
+        ["kind", "status"],
+    )
 else:
     # Fallback no-op objects if prometheus_client is not installed
     class NoOpMetric:
@@ -58,6 +76,9 @@ else:
     ACTIVE_CONNECTIONS = NoOpMetric()  # type: ignore[assignment]
     RECONNECTS_TOTAL = NoOpMetric()  # type: ignore[assignment]
     SNAPSHOTS_CREATED_TOTAL = NoOpMetric()  # type: ignore[assignment]
+    AI_TOKENS_TOTAL = NoOpMetric()  # type: ignore[assignment]
+    AI_LATENCY_SECONDS = NoOpMetric()  # type: ignore[assignment]
+    AI_REQUESTS_TOTAL = NoOpMetric()  # type: ignore[assignment]
 
 
 def metrics_export_view(request: Any) -> Any:
