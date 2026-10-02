@@ -31,8 +31,8 @@ async def test_disconnect_mid_edit_no_duplicate_or_loss() -> None:
     # Client generates 2 operations
     cid1 = CharId(1, "client_a")
     cid2 = CharId(2, "client_a")
-    op1 = Op.create_insert("client_a", 1, cid1, ROOT, "H")
-    op2 = Op.create_insert("client_a", 2, cid2, cid1, "i")
+    op1 = Op.create_insert("client_a", cid1, ROOT, "H")
+    op2 = Op.create_insert("client_a", cid2, cid1, "i")
 
     # Send op1 and receive ack
     await comm1.send_json_to({"type": "op", "op": op1.to_dict()})
@@ -93,7 +93,7 @@ async def test_offline_concurrent_editing_merges_on_reconnect() -> None:
     parent = ROOT
     for idx, c in enumerate(chars, start=1):
         cid = CharId(idx, "initial")
-        op = Op.create_insert("initial", idx, cid, parent, c)
+        op = Op.create_insert("initial", cid, parent, c)
         await comm_online.send_json_to({"type": "op", "op": op.to_dict()})
         await comm_online.receive_json_from()  # ack
         parent = cid
@@ -105,9 +105,9 @@ async def test_offline_concurrent_editing_merges_on_reconnect() -> None:
 
     # --- Concurrent Edits While Client B is Offline ---
     # 1. Client A (online) inserts "!" at the end (pos 4 -> "BASE!")
-    cid_a = CharId(10, "client_a")
+    cid_a = CharId(10, "initial")
     parent_e = CharId(4, "initial")
-    op_online = Op.create_insert("client_a", 10, cid_a, parent_e, "!")
+    op_online = Op.create_insert("initial", cid_a, parent_e, "!")
     await comm_online.send_json_to({"type": "op", "op": op_online.to_dict()})
     await comm_online.receive_json_from()  # ack
 
@@ -177,7 +177,7 @@ async def test_server_crash_recovery_from_database() -> None:
     parent = ROOT
     for i, ch in enumerate(expected_str, start=1):
         cid = CharId(i, "node1")
-        op = Op.create_insert("node1", i, cid, parent, ch)
+        op = Op.create_insert("node1", cid, parent, ch)
         await comm.send_json_to({"type": "op", "op": op.to_dict()})
         await comm.receive_json_from()
         parent = cid

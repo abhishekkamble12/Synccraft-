@@ -15,6 +15,7 @@ from documents.permissions import can_edit, get_role
 from documents.services import (
     apply_operations,
     broadcast_ops,
+    committed,
     generate_revert_operations,
     get_document_state,
     reconstruct_state_at_seq,
@@ -59,7 +60,10 @@ class DocumentHistoryApiView(LoginRequiredMixin, View):
                 "site_id": op.site_id,
                 "user": op.user.username if op.user else "system",
                 "timestamp": op.created_at.isoformat(),
-                "char": op.payload.get("char") if op.type == "insert" else None,
+                # "text" for run-length ops, "char" for ops logged before RLE.
+                "text": op.payload.get("text", op.payload.get("char"))
+                if op.type == "insert"
+                else None,
             }
             for op in ops_qs
         ]
@@ -125,7 +129,9 @@ class DocumentRevertApiView(LoginRequiredMixin, View):
             )
 
         site_id = f"revert_{request.user.pk}_{uuid.uuid4().hex[:6]}"
-        compensating_ops = generate_revert_operations(doc.id, target_seq=seq, site_id=site_id)
+        compensating_ops, base_seq = generate_revert_operations(
+            doc.id, target_seq=seq, site_id=site_id
+        )
 
         if not compensating_ops:
             return JsonResponse(
@@ -138,13 +144,18 @@ class DocumentRevertApiView(LoginRequiredMixin, View):
                 }
             )
 
-        results = apply_operations(doc.id, compensating_ops, user=request.user)  # type: ignore[arg-type]
-        applied = [
-            (new_seq, op)
-            for op, (new_seq, is_new) in zip(compensating_ops, results, strict=True)
-            if is_new
-        ]
+        results = apply_operations(
+            doc.id,
+            compensating_ops,
+            user=request.user,  # type: ignore[arg-type]
+            base_seqs=[base_seq] * len(compensating_ops),
+        )
+        applied = committed(compensating_ops, results)
         broadcast_ops(doc.id, applied, sender_channel="revert_api")
+        if any(not r.ok for r in results):
+            return JsonResponse(
+                {"error": "The document changed underneath the revert; retry."}, status=409
+            )
 
         state = get_document_state(doc.id)
         return JsonResponse(

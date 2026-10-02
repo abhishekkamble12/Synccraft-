@@ -1,0 +1,8 @@
+{
+  "name": "collab-sync-benchmarks",
+  "private": true,
+  "description": "Optional reference CRDT for benchmarks/crdt_bench.mjs",
+  "devDependencies": {
+    "yjs": "^13.6.0"
+  }
+}

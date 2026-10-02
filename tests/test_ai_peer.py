@@ -53,7 +53,7 @@ def _type_text(doc: Document, user: User, text: str, site: str) -> None:
     parent = ROOT
     for i, ch in enumerate(text, start=1):
         cid = CharId(i, site)
-        ops.append(Op.create_insert(site, i, cid, parent, ch))
+        ops.append(Op.create_insert(site, cid, parent, ch))
         parent = cid
     services.apply_operations(doc.id, ops, user=user)
 

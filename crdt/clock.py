@@ -36,6 +36,18 @@ class LamportClock:
             self._value += 1
             return self._value
 
+    def reserve(self, count: int) -> int:
+        """
+        Reserve `count` consecutive timestamps for one local event that creates
+        several ids (a run of inserted text). Returns the first of them.
+        """
+        if count < 1:
+            raise ValueError("reserve() needs a positive count.")
+        with self._lock:
+            first = self._value + 1
+            self._value += count
+            return first
+
     def update(self, remote_timestamp: int) -> int:
         """
         Advance the clock on receiving a message with a remote timestamp.

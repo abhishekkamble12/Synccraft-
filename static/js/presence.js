@@ -194,7 +194,13 @@ class PresenceManager {
     const label = el.querySelector('.remote-cursor-label');
     if (label) label.style.backgroundColor = info.color;
 
-    const coords = this._getCaretCoordinates(info.cursorPos);
+    // Resolve the collaborator's CharId anchor against our replica so their caret
+    // tracks the character they are at, even after edits shifted the offsets.
+    const app = typeof window !== 'undefined' ? window.App : null;
+    const pos = app && app.resolveRemoteCursor
+      ? app.resolveRemoteCursor(info.cursorAnchor, info.cursorPos)
+      : info.cursorPos;
+    const coords = this._getCaretCoordinates(pos);
     el.style.top = `${coords.top}px`;
     el.style.left = `${coords.left}px`;
     el.style.height = `${coords.height}px`;

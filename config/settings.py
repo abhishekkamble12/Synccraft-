@@ -142,6 +142,16 @@ AI_TASKS_INLINE = env_bool("AI_TASKS_INLINE", not REDIS_URL)
 # Reconnecting clients that missed at least this many ops get an AI summary.
 MISSED_SUMMARY_THRESHOLD = int(os.environ.get("MISSED_SUMMARY_THRESHOLD", "20"))
 
+# Tombstone GC. A client that reported nothing for SITE_SESSION_TTL_SEC stops holding
+# GC back; if it returns, its old ops are rejected as stale and it rebases them.
+SITE_SESSION_TTL_SEC = int(os.environ.get("SITE_SESSION_TTL_SEC", str(24 * 3600)))
+# Compact once the stable point has advanced this many ops past the last compaction ...
+GC_MIN_OPS = int(os.environ.get("GC_MIN_OPS", "1000"))
+# ... checking at most this often per document.
+GC_CHECK_INTERVAL_SEC = float(os.environ.get("GC_CHECK_INTERVAL_SEC", "10"))
+# Heartbeat watermarks are batched into one DB write per document per interval.
+ACK_FLUSH_INTERVAL_SEC = float(os.environ.get("ACK_FLUSH_INTERVAL_SEC", "5"))
+
 # Serve /static/ from the ASGI app (demo deployments without a CDN / nginx static root).
 SERVE_STATIC = env_bool("SERVE_STATIC", DEBUG)
 

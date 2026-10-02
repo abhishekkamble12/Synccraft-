@@ -4,6 +4,7 @@ WebSocket consumer for real-time document synchronization and presence.
 
 import asyncio
 import logging
+import time
 import uuid
 from typing import Any
 
@@ -19,12 +20,23 @@ from crdt.ops import Op
 from documents.metrics import ACTIVE_CONNECTIONS, SYNCS
 from documents.models import AIJob, Document, Suggestion
 from documents.permissions import can_edit, get_role
-from documents.services import get_document_state, sync_client_state
+from documents.services import (
+    OpResult,
+    get_document_state,
+    heartbeat,
+    record_site_ack,
+    sync_client_state,
+    touch_site,
+)
 from documents.write_queue import submit_op
 
 logger = logging.getLogger(__name__)
 
 MAX_PENDING_OPS_PER_SYNC = 5_000
+MAX_SITE_ID_LEN = 64
+# Channel-layer group memberships live in Redis. If Redis restarts they are lost and
+# the socket silently stops receiving broadcasts, so re-join on the heartbeat.
+GROUP_REFRESH_SEC = 15.0
 AI_KINDS = frozenset(k for k, _ in AIJob.KIND_CHOICES) - {"summary"}
 
 # Strong references to in-process AI tasks so they are not garbage collected mid-run.
@@ -44,6 +56,11 @@ class DocumentConsumer(AsyncJsonWebsocketConsumer):
         self.role: str = "viewer"
         self._tasks: set[asyncio.Task[Any]] = set()
         self._summary_requested = False
+        # The CRDT site this socket edits as, bound by sync (or the first op). Live
+        # ops under any other site_id are rejected. A sync may rebind it, e.g. after
+        # the client rebased onto a fresh site; site ownership is checked per user.
+        self.site_id: str | None = None
+        self._group_refreshed_at = 0.0
 
     async def connect(self) -> None:
         raw_doc_id = self.scope["url_route"]["kwargs"].get("doc_id")
@@ -62,16 +79,20 @@ class DocumentConsumer(AsyncJsonWebsocketConsumer):
 
         self.group_name = f"doc_{self.doc_id}"
         await self.channel_layer.group_add(self.group_name, self.channel_name)
+        self._group_refreshed_at = time.monotonic()
         await self.accept()
         ACTIVE_CONNECTIONS.inc()
 
-        state = await database_sync_to_async(get_document_state)(self.doc_id)
+        await self._send_init()
+
+    async def _send_init(self) -> None:
+        state = await database_sync_to_async(get_document_state)(self._doc)
         await self.send_json(
             {
                 "type": "init",
                 "doc_id": str(self.doc_id),
                 "head_seq": state.seq,
-                "text": state.text,
+                "gc_seq": state.gc_seq,
                 "snapshot": state.state,
                 "role": self.role,
             }
@@ -93,6 +114,8 @@ class DocumentConsumer(AsyncJsonWebsocketConsumer):
                 },
             )
             await self.channel_layer.group_discard(self.group_name, self.channel_name)
+        if self.site_id is not None and self.doc_id is not None:
+            await database_sync_to_async(touch_site)(self.doc_id, self.site_id)
 
     async def receive_json(self, content: Any, **kwargs: Any) -> None:
         if not isinstance(content, dict):
@@ -102,6 +125,8 @@ class DocumentConsumer(AsyncJsonWebsocketConsumer):
         handlers = {
             "op": self._handle_op_message,
             "sync": self._handle_sync_message,
+            "stable": self._handle_stable_message,
+            "resync": self._handle_resync_message,
             "presence": self._handle_presence_message,
             "ai_request": self._handle_ai_request_message,
             "ai_cancel": self._handle_ai_cancel_message,
@@ -131,24 +156,34 @@ class DocumentConsumer(AsyncJsonWebsocketConsumer):
 
         try:
             op = Op.from_dict(content["op"])
+            # A missing base is treated as the oldest possible state, never as trusted.
+            base_seq = max(0, int(content.get("base_seq", 0)))
         except Exception as exc:
             await self._send_error("bad_op", f"Invalid op payload: {exc}")
             return
 
+        if self.site_id is None:
+            self.site_id = op.site_id[:MAX_SITE_ID_LEN]
+        if op.site_id != self.site_id:
+            await self._send_rejection(op.op_id, "site_mismatch")
+            return
+
         # Enqueue synchronously (preserving this client's op order), then ack from a
         # task so this consumer keeps delivering peers' broadcasts while it waits.
-        future = submit_op(self._doc, op, self.user, self.channel_name)
+        future = submit_op(self._doc, op, self.user, self.channel_name, base_seq=base_seq)
         self._track(asyncio.create_task(self._ack_when_committed(op.op_id, future)))
 
-    async def _ack_when_committed(
-        self, op_id: str, future: "asyncio.Future[tuple[int, bool]]"
-    ) -> None:
-        try:
-            server_seq, _ = await future
-        except Exception:
-            await self._safe_send({"type": "error", "code": "op_rejected", "op_id": op_id})
+    async def _ack_when_committed(self, op_id: str, future: "asyncio.Future[OpResult]") -> None:
+        result = await future
+        if result.error is not None:
+            await self._send_rejection(op_id, result.error)
             return
-        await self._safe_send({"type": "ack", "op_id": op_id, "seq": server_seq})
+        await self._safe_send({"type": "ack", "op_id": op_id, "seq": result.seq})
+
+    async def _send_rejection(self, op_id: str, reason: str) -> None:
+        await self._safe_send(
+            {"type": "error", "code": "op_rejected", "op_id": op_id, "reason": reason}
+        )
 
     async def _handle_sync_message(self, content: dict[str, Any]) -> None:
         try:
@@ -166,15 +201,33 @@ class DocumentConsumer(AsyncJsonWebsocketConsumer):
             return
 
         pending_ops: list[Op] = []
+        base_seqs: list[int | None] = []
         if can_edit(self.role):
             for raw in raw_pending:
                 try:
-                    pending_ops.append(Op.from_dict(raw))
+                    # Current clients send {"op": ..., "base_seq": n}; bare ops are
+                    # treated as based on the oldest state.
+                    if isinstance(raw, dict) and "op" in raw:
+                        op = Op.from_dict(raw["op"])
+                        base = max(0, int(raw.get("base_seq", 0)))
+                    else:
+                        op, base = Op.from_dict(raw), 0
                 except Exception:
                     logger.info("Dropping malformed pending op on doc %s", self.doc_id)
+                    continue
+                pending_ops.append(op)
+                base_seqs.append(base)
+
+            site_id = content.get("site_id")
+            if isinstance(site_id, str) and 0 < len(site_id) <= MAX_SITE_ID_LEN:
+                floor = min([last_seq, *(b for b in base_seqs if b is not None)])
+                if await database_sync_to_async(record_site_ack)(
+                    self._doc, site_id, self.user, floor
+                ):
+                    self.site_id = site_id
 
         result = await database_sync_to_async(sync_client_state)(
-            self.doc_id, last_seq, pending_ops, user=self.user
+            self._doc, last_seq, pending_ops, user=self.user, base_seqs=base_seqs
         )
 
         # Only ops this sync actually persisted are new to the other clients.
@@ -195,7 +248,9 @@ class DocumentConsumer(AsyncJsonWebsocketConsumer):
                 "type": "sync_ack",
                 "missed": result.missed,
                 "acked": result.acked,
+                "rejected": result.rejected,
                 "head_seq": result.head_seq,
+                "gc_seq": result.gc_seq,
             }
         )
 
@@ -210,6 +265,34 @@ class DocumentConsumer(AsyncJsonWebsocketConsumer):
         ):
             self._summary_requested = True
             await self._request_missed_summary(last_seq, result.head_seq)
+
+    async def _handle_stable_message(self, content: dict[str, Any]) -> None:
+        """
+        Heartbeat. The client promises no future op of this site is based on a state
+        before `seq` (the GC watermark); we answer with the current head so a client
+        whose broadcasts were silently lost notices it is behind and re-syncs.
+        """
+        try:
+            seq = max(0, int(content.get("seq", 0)))
+        except (TypeError, ValueError):
+            return
+        # Run as a task: awaiting the DB here would stall this socket's broadcast
+        # delivery behind the shared DB thread while its acks keep flowing, which
+        # shows up on the client as seq gaps.
+        self._track(asyncio.create_task(self._heartbeat(seq)))
+
+    async def _heartbeat(self, seq: int) -> None:
+        site = self.site_id if can_edit(self.role) else None
+        head = await database_sync_to_async(heartbeat)(self._doc, site, self.user, seq)
+        now = time.monotonic()
+        if now - self._group_refreshed_at >= GROUP_REFRESH_SEC:
+            self._group_refreshed_at = now
+            await self.channel_layer.group_add(self.group_name, self.channel_name)
+        await self._safe_send({"type": "head", "seq": head})
+
+    async def _handle_resync_message(self, content: dict[str, Any]) -> None:
+        """Send the full current state again (used by clients that must rebase)."""
+        await self._send_init()
 
     async def _handle_presence_message(self, content: dict[str, Any]) -> None:
         payload = {

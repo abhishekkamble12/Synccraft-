@@ -18,7 +18,7 @@ from tests.helpers import ws_communicator
 
 
 def _insert(site: str, clock: int, parent: CharId, ch: str) -> Op:
-    return Op.create_insert(site, clock, CharId(clock, site), parent, ch)
+    return Op.create_insert(site, CharId(clock, site), parent, ch)
 
 
 # -----------------------------------------------------------------------------
@@ -43,7 +43,7 @@ def test_apply_operation_completes_without_deadlock() -> None:
     t.start()
     t.join(timeout=10)
     assert not t.is_alive(), "apply_operation deadlocked"
-    assert outcome == [(1, True)]
+    assert outcome == [services.OpResult(1, True)]
 
 
 @pytest.mark.django_db(transaction=True)
@@ -106,7 +106,7 @@ def test_replica_catches_up_with_writes_from_another_process() -> None:
 
     # ... and so do writes, including snapshots taken by this node.
     op3 = _insert("node1", 3, op2.char_id, "C")
-    assert services.apply_operation(doc.id, op3) == (3, True)
+    assert services.apply_operation(doc.id, op3) == services.OpResult(3, True)
     services.clear_replica_cache()
     assert services.get_document_state(doc.id).text == "ABC"
 
@@ -133,7 +133,8 @@ def test_snapshot_written_every_interval_matches_log(monkeypatch: pytest.MonkeyP
 
 
 @pytest.mark.django_db
-def test_failed_batch_does_not_poison_cache() -> None:
+def test_op_id_reused_from_another_document_is_rejected_not_fatal() -> None:
+    """It once failed the whole batch with an IntegrityError; now only that op is refused."""
     user = User.objects.create(username="poison")
     doc = Document.objects.create(owner=user)
     other = Document.objects.create(owner=user)
@@ -141,9 +142,26 @@ def test_failed_batch_does_not_poison_cache() -> None:
     clash = Operation.objects.get(document=other).op_id
 
     good = _insert("s", 1, ROOT, "A")
-    bad = Op.create_insert("s", 2, CharId(2, "s"), good.char_id, "B", op_id=clash)
-    with pytest.raises(Exception):  # noqa: B017 - IntegrityError type is backend specific
-        services.apply_operations(doc.id, [good, bad])
+    bad = Op.create_insert("s", CharId(2, "s"), good.char_id, "B", op_id=clash)
+    results = services.apply_operations(doc.id, [good, bad])
+
+    assert [r.error for r in results] == [None, "duplicate_op_id"]
+    assert services.get_document_state(doc.id).text == "A"
+    assert Operation.objects.filter(document=doc).count() == 1
+
+
+@pytest.mark.django_db
+def test_failed_transaction_does_not_poison_cache(monkeypatch: pytest.MonkeyPatch) -> None:
+    user = User.objects.create(username="poison2")
+    doc = Document.objects.create(owner=user)
+
+    def boom(*args: object, **kwargs: object) -> None:
+        raise RuntimeError("disk full")
+
+    monkeypatch.setattr(Operation.objects, "bulk_create", boom)
+    with pytest.raises(RuntimeError):
+        services.apply_operations(doc.id, [_insert("s", 1, ROOT, "A")])
+    monkeypatch.undo()
 
     assert services.get_document_state(doc.id).text == ""
     assert Operation.objects.filter(document=doc).count() == 0
@@ -162,7 +180,7 @@ def test_revert_ops_are_minimal_and_exact() -> None:
     )
     assert services.get_document_state(doc.id).text == "_abXdef"
 
-    revert = services.generate_revert_operations(doc.id, target_seq, site_id="rv")
+    revert, _ = services.generate_revert_operations(doc.id, target_seq, site_id="rv")
     assert len(revert) == 3  # delete "_", delete "X", re-insert "c"
     services.apply_operations(doc.id, revert)
     assert services.get_document_state(doc.id).text == "abcdef"

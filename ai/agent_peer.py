@@ -33,7 +33,13 @@ from crdt.ids import CharId
 from crdt.rga import RGA
 from documents.metrics import AI_JOB_SECONDS, AI_JOBS
 from documents.models import AIJob
-from documents.services import apply_operations, broadcast_ops, diff_to_ops, get_document_state
+from documents.services import (
+    apply_operations,
+    broadcast_ops,
+    committed,
+    diff_to_ops,
+    get_document_state,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -264,11 +270,19 @@ class AIPeer:
         The ops are generated against the latest server state; any human edits that
         land between generation and commit are concurrent ops and merge normally.
         """
-        working = RGA.from_dict(get_document_state(self.doc_id).state, site_id=self.site_id)
+        state = get_document_state(self.doc_id)
+        working = RGA.from_dict(state.state, site_id=self.site_id)
         start_pos, end_pos, _ = self.resolve_anchor_range(working, start_anchor, end_anchor)
         ops = diff_to_ops(working, start_pos, end_pos, replacement_text)
 
-        results = apply_operations(self.doc_id, ops, user=self.user)
-        applied = [(seq, op) for op, (seq, is_new) in zip(ops, results, strict=True) if is_new]
+        # The ops are based on `state.seq`; if tombstone GC overtook that state in
+        # the meantime the server rejects them as stale rather than guessing.
+        results = apply_operations(
+            self.doc_id, ops, user=self.user, base_seqs=[state.seq] * len(ops)
+        )
+        applied = committed(ops, results)
         broadcast_ops(self.doc_id, applied, sender_channel=f"ai_{self.site_id}")
+        rejected = [r.error for r in results if r.error is not None]
+        if rejected:
+            raise RuntimeError(f"AI edit rejected by the server: {rejected[0]}")
         return len(applied)

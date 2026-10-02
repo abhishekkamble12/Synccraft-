@@ -1,26 +1,35 @@
 {
-  "doc_id": "a1b38300-c053-4900-99e3-f88a1e493a67",
+  "doc_id": "c33252d2-8382-4be9-b99c-0094cb1f0265",
   "clients": 5,
   "ops_sent": 100,
+  "chars_sent": 104,
   "ops_acked": 100,
+  "ops_rejected": 0,
+  "rebases": 0,
+  "reconnects": 0,
   "server_head_seq": 100,
   "broadcasts_received": 400,
-  "broadcasts_expected": 400,
-  "broadcasts_dropped_by_channel_layer": 0,
   "gap_repairs": 0,
-  "offered_load_ops_per_sec": 43.8,
-  "committed_ops_per_sec": 46.9,
+  "offered_load_ops_per_sec": 46.2,
+  "committed_ops_per_sec": 47.6,
   "propagation_ms": {
-    "p50": 24.19,
-    "p95": 33.72,
-    "p99": 34.71,
-    "max": 35.89
+    "p50": 22.0,
+    "p95": 64.78,
+    "p99": 95.94,
+    "max": 96.21
   },
   "ack_rtt_ms": {
-    "p50": 16.75,
-    "p95": 27.5,
-    "p99": 32.31
+    "p50": 15.38,
+    "p95": 55.6,
+    "p99": 85.55
   },
+  "unacked_ops": 0,
   "converged_with_server": true,
-  "final_doc_len": 72
+  "final_doc_len": 72,
+  "setup": {
+    "label": "single-node-sqlite",
+    "ops_per_client": 20,
+    "paste_chance": 0.0,
+    "server": "1 Daphne process, SQLite, in-memory channel layer"
+  }
 }

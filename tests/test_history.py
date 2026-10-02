@@ -25,9 +25,9 @@ def test_history_api_and_state_at_seq() -> None:
     c1 = CharId(1, "s1")
     c2 = CharId(2, "s1")
     c3 = CharId(3, "s1")
-    services.apply_operation(doc.id, Op.create_insert("s1", 1, c1, ROOT, "A"), user)
-    services.apply_operation(doc.id, Op.create_insert("s1", 2, c2, c1, "B"), user)
-    services.apply_operation(doc.id, Op.create_insert("s1", 3, c3, c2, "C"), user)
+    services.apply_operation(doc.id, Op.create_insert("s1", c1, ROOT, "A"), user)
+    services.apply_operation(doc.id, Op.create_insert("s1", c2, c1, "B"), user)
+    services.apply_operation(doc.id, Op.create_insert("s1", c3, c2, "C"), user)
 
     # 1. Test GET /api/docs/<id>/history/
     res_hist = client.get(f"/api/docs/{doc.id}/history/")
@@ -69,7 +69,7 @@ def test_revert_api_generates_compensating_ops_and_converges() -> None:
     parent = ROOT
     for i, ch in enumerate(text, start=1):
         cid = CharId(i, "s1")
-        op = Op.create_insert("s1", i, cid, parent, ch)
+        op = Op.create_insert("s1", cid, parent, ch)
         services.apply_operation(doc.id, op, user)
         parent = cid
 
@@ -104,16 +104,18 @@ def test_concurrent_editing_during_revert_converges() -> None:
     c1 = CharId(1, "s1")
     c2 = CharId(2, "s1")
     c3 = CharId(3, "s1")
-    services.apply_operation(doc.id, Op.create_insert("s1", 1, c1, ROOT, "A"), user)
-    services.apply_operation(doc.id, Op.create_insert("s1", 2, c2, c1, "B"), user)
-    services.apply_operation(doc.id, Op.create_insert("s1", 3, c3, c2, "C"), user)
+    services.apply_operation(doc.id, Op.create_insert("s1", c1, ROOT, "A"), user)
+    services.apply_operation(doc.id, Op.create_insert("s1", c2, c1, "B"), user)
+    services.apply_operation(doc.id, Op.create_insert("s1", c3, c2, "C"), user)
 
     # 1. Client A generates revert ops to state at seq 1 ("A")
-    revert_ops = services.generate_revert_operations(doc.id, target_seq=1, site_id="site_revert")
+    revert_ops, _ = services.generate_revert_operations(
+        doc.id, target_seq=1, site_id="site_revert"
+    )
 
     # 2. Client B concurrently generates an insert of "Z" after "A"
     cz = CharId(10, "client_b")
-    op_b = Op.create_insert("client_b", 10, cz, c1, "Z")
+    op_b = Op.create_insert("client_b", cz, c1, "Z")
 
     # 3. Interleaved application: Apply op_b, then revert_ops
     services.apply_operation(doc.id, op_b, user)

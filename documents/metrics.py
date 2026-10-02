@@ -21,6 +21,13 @@ COMMIT_SECONDS = Histogram(
 ACTIVE_CONNECTIONS = Gauge("collab_active_connections", "Open document WebSockets.")
 SYNCS = Counter("collab_syncs_total", "Client sync requests.", ["reason"])
 SNAPSHOTS_CREATED = Counter("collab_snapshots_created_total", "Periodic RGA snapshots written.")
+OPS_REJECTED = Counter(
+    "collab_ops_rejected_total", "Ops refused by server-side validation.", ["reason"]
+)
+COMPACTIONS = Counter("collab_compactions_total", "Tombstone garbage-collection passes.")
+TOMBSTONES_COLLECTED = Counter(
+    "collab_tombstones_collected_total", "Tombstones dropped by garbage collection."
+)
 AI_JOBS = Counter("collab_ai_jobs_total", "Finished AI jobs.", ["kind", "status"])
 AI_JOB_SECONDS = Histogram(
     "collab_ai_job_seconds",

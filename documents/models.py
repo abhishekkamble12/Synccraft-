@@ -19,6 +19,11 @@ class Document(models.Model):
     head_seq = models.BigIntegerField(
         default=0, help_text="Monotonically increasing sequence number of the latest operation."
     )
+    gc_seq = models.BigIntegerField(
+        default=0,
+        help_text="Tombstones deleted at or before this seq may have been garbage-collected. "
+        "Ops based on an older state are rejected as stale.",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -92,6 +97,37 @@ class Operation(models.Model):
 
     def __str__(self) -> str:
         return f"Op #{self.server_seq} ({self.type}) on {self.document_id} by {self.site_id}"
+
+
+class SiteSession(models.Model):
+    """
+    One CRDT site (a client replica, an AI job, a revert) on one document.
+
+    * Binds the site_id to the user who first wrote with it, so nobody can submit
+      ops under another user's site.
+    * `acked_seq` is the oldest server seq any not-yet-acknowledged op from this
+      site can be based on. Tombstone GC never goes past the minimum over live
+      sessions (see documents/services.py:stable_seq).
+    * A site is `retired` the first time one of its ops is rejected; its later
+      ops are rejected too, so a site's committed ops are always a prefix of the
+      ops it sent. The client then rebases under a new site_id.
+    """
+
+    document = models.ForeignKey(Document, on_delete=models.CASCADE, related_name="sites")
+    site_id = models.CharField(max_length=64)
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, null=True, blank=True, related_name="sites"
+    )
+    acked_seq = models.BigIntegerField(null=True, blank=True)
+    retired = models.BooleanField(default=False)
+    last_seen = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("document", "site_id")
+        indexes = [models.Index(fields=["document", "last_seen"])]
+
+    def __str__(self) -> str:
+        return f"Site {self.site_id} on {self.document_id} (acked {self.acked_seq})"
 
 
 class Snapshot(models.Model):

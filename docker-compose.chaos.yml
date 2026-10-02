@@ -1,0 +1,17 @@
+# Overrides for loadtest/chaos.py: aggressive tombstone GC and a short session TTL,
+# so that clients partitioned for longer than the TTL come back stale and have to
+# rebase their offline edits.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.chaos.yml up -d --build
+
+x-chaos-env: &chaos-env
+  GC_MIN_OPS: "50"
+  GC_CHECK_INTERVAL_SEC: "1"
+  SITE_SESSION_TTL_SEC: "6"
+  ACK_FLUSH_INTERVAL_SEC: "1"
+
+services:
+  web_1:
+    environment: *chaos-env
+  web_2:
+    environment: *chaos-env

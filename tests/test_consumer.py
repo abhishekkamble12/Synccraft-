@@ -27,7 +27,8 @@ async def test_websocket_consumer_connection_and_init() -> None:
     assert response["type"] == "init"
     assert response["doc_id"] == str(doc.id)
     assert response["head_seq"] == 0
-    assert response["text"] == ""
+    assert response["snapshot"]["runs"] == []
+    assert response["gc_seq"] == 0
 
     await communicator.disconnect()
 
@@ -51,7 +52,7 @@ async def test_websocket_consumer_op_broadcast_between_clients() -> None:
 
     # Client 1 sends an insert op
     cid = CharId(1, "client1")
-    op = Op.create_insert("client1", 1, cid, ROOT, "A")
+    op = Op.create_insert("client1", cid, ROOT, "A")
 
     await comm1.send_json_to(
         {
@@ -69,7 +70,7 @@ async def test_websocket_consumer_op_broadcast_between_clients() -> None:
     # Client 2 receives broadcasted 'op'
     broadcast = await comm2.receive_json_from()
     assert broadcast["type"] == "ops"
-    assert [(i["seq"], i["op"]["char"]) for i in broadcast["ops"]] == [(1, "A")]
+    assert [(i["seq"], i["op"]["text"]) for i in broadcast["ops"]] == [(1, "A")]
 
     await comm1.disconnect()
     await comm2.disconnect()

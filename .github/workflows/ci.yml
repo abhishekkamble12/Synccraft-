@@ -86,7 +86,7 @@ jobs:
       - name: Load test through nginx (fails on divergence or unacked ops)
         run: |
           python -m loadtest.swarm --url http://localhost:8080 --clients 20 --ops 30 \
-            | tee loadtest-result.json
+            --paste-chance 0.05 | tee loadtest-result.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -95,3 +95,36 @@ jobs:
       - name: Service logs
         if: failure()
         run: docker compose logs --no-color
+
+  chaos:
+    name: Chaos (node kills, Redis restart, DB pause, partitions)
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements-dev.txt
+      - name: Start the cluster with aggressive GC and a 6 s session TTL
+        run: |
+          docker compose -f docker-compose.yml -f docker-compose.chaos.yml up -d --build
+          for i in $(seq 1 90); do
+            curl -fsS -o /dev/null http://localhost:8080/accounts/login/ && exit 0
+            sleep 2
+          done
+          docker compose ps
+          exit 1
+      - name: Edit through injected faults; fail unless every replica converges
+        run: |
+          python -m loadtest.chaos --url http://localhost:8080 --clients 12 --duration 60 \
+            --seed ${{ github.run_number }} | tee chaos-result.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: chaos-result
+          path: chaos-result.json
+      - name: Service logs
+        if: failure()
+        run: docker compose -f docker-compose.yml -f docker-compose.chaos.yml logs --no-color

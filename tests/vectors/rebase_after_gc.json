@@ -1,0 +1,218 @@
+{
+ "name": "rebase_after_gc",
+ "kind": "rebase",
+ "shared": [
+  {
+   "op_id": "6772bf7469204dd2a6eb206e78b8b713",
+   "site_id": "alice",
+   "lamport": 25,
+   "type": "insert",
+   "char_id": "1@alice",
+   "parent_id": "0@",
+   "text": "the quick brown fox jumps"
+  }
+ ],
+ "pending": [
+  {
+   "op_id": "a5c2bbf12f9d417d80d66fb8ab8100e3",
+   "site_id": "bob",
+   "lamport": 27,
+   "type": "delete",
+   "spans": [
+    [
+     "13@alice",
+     1
+    ]
+   ]
+  },
+  {
+   "op_id": "d1ed223907dc410d9655952c1edb8a11",
+   "site_id": "bob",
+   "lamport": 28,
+   "type": "insert",
+   "char_id": "28@bob",
+   "parent_id": "22@alice",
+   "text": "😀"
+  },
+  {
+   "op_id": "f43b24d51bc34444b627bae335caa439",
+   "site_id": "bob",
+   "lamport": 29,
+   "type": "delete",
+   "spans": [
+    [
+     "5@alice",
+     2
+    ]
+   ]
+  },
+  {
+   "op_id": "b94c50c12f104f0d86af8de015e89ae6",
+   "site_id": "bob",
+   "lamport": 30,
+   "type": "insert",
+   "char_id": "30@bob",
+   "parent_id": "0@",
+   "text": "😀"
+  },
+  {
+   "op_id": "53157e21baf14bda835dd406894c73f6",
+   "site_id": "bob",
+   "lamport": 31,
+   "type": "insert",
+   "char_id": "31@bob",
+   "parent_id": "17@alice",
+   "text": "!"
+  },
+  {
+   "op_id": "30f15c9c753c4ea193441a787cfc178d",
+   "site_id": "bob",
+   "lamport": 32,
+   "type": "insert",
+   "char_id": "32@bob",
+   "parent_id": "4@alice",
+   "text": "😀"
+  }
+ ],
+ "server_snapshot": {
+  "v": 2,
+  "site_id": "server",
+  "clock": 32,
+  "vv": {
+   "alice": 31
+  },
+  "runs": [
+   [
+    "1@alice",
+    "the ",
+    0
+   ],
+   [
+    "27@alice",
+    "lazy ",
+    0
+   ],
+   [
+    "17@alice",
+    "fox jumps",
+    0
+   ]
+  ]
+ },
+ "old_site": "bob",
+ "old_clock": 32,
+ "new_site": "bob-2",
+ "expected_text": "😀the 😀lazy f!ox ju😀mps",
+ "expected_order": [
+  [
+   "35@bob-2",
+   "😀",
+   false
+  ],
+  [
+   "1@alice",
+   "t",
+   false
+  ],
+  [
+   "2@alice",
+   "h",
+   false
+  ],
+  [
+   "3@alice",
+   "e",
+   false
+  ],
+  [
+   "4@alice",
+   " ",
+   false
+  ],
+  [
+   "37@bob-2",
+   "😀",
+   false
+  ],
+  [
+   "27@alice",
+   "l",
+   false
+  ],
+  [
+   "28@alice",
+   "a",
+   false
+  ],
+  [
+   "29@alice",
+   "z",
+   false
+  ],
+  [
+   "30@alice",
+   "y",
+   false
+  ],
+  [
+   "31@alice",
+   " ",
+   false
+  ],
+  [
+   "17@alice",
+   "f",
+   false
+  ],
+  [
+   "36@bob-2",
+   "!",
+   false
+  ],
+  [
+   "18@alice",
+   "o",
+   false
+  ],
+  [
+   "19@alice",
+   "x",
+   false
+  ],
+  [
+   "20@alice",
+   " ",
+   false
+  ],
+  [
+   "21@alice",
+   "j",
+   false
+  ],
+  [
+   "22@alice",
+   "u",
+   false
+  ],
+  [
+   "34@bob-2",
+   "😀",
+   false
+  ],
+  [
+   "23@alice",
+   "m",
+   false
+  ],
+  [
+   "24@alice",
+   "p",
+   false
+  ],
+  [
+   "25@alice",
+   "s",
+   false
+  ]
+ ]
+}

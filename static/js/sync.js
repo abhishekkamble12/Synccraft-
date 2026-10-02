@@ -1,6 +1,16 @@
 /**
- * Persistent Offline Synchronization Engine with IndexedDB / localStorage storage,
- * Exponential Backoff with Jitter, and Idempotent Catch-up Protocol.
+ * WebSocket sync client: offline persistence, exponential backoff with jitter,
+ * sequence-gap repair, GC watermark reporting, and rebase on rejection.
+ *
+ * Protocol (see docs/DESIGN.md):
+ *   server -> init {head_seq, gc_seq, snapshot}     on every (re)connect and on resync
+ *   client -> sync {site_id, last_seq, pending:[{op, base_seq}]}
+ *   client -> op {op, base_seq}                     base_seq = state the op was made from
+ *   server -> ack {op_id, seq} | error {code:"op_rejected", op_id, reason}
+ *   server -> ops {ops:[{seq, op}]}                 batched broadcast
+ *   client -> stable {seq}                          no future op will be based on < seq
+ *   server -> head {seq}                            heartbeat reply: current head of the log
+ *   client -> resync                                ask for a fresh init (after a rejection)
  */
 
 class OfflineStorage {
@@ -9,36 +19,37 @@ class OfflineStorage {
     this.seqKey = `collab_sync_last_seq_${docId}`;
   }
 
-  loadPendingOps() {
+  /** Pending entries are {op, base_seq}; bare ops from older versions get base_seq 0. */
+  loadPending() {
     try {
       const raw = localStorage.getItem(this.storageKey);
-      return raw ? JSON.parse(raw) : [];
+      const items = raw ? JSON.parse(raw) : [];
+      return items.map((item) => (item && item.op ? item : { op: item, base_seq: 0 }));
     } catch (e) {
       console.warn('Failed to load pending ops from storage:', e);
       return [];
     }
   }
 
-  savePendingOps(ops) {
+  savePending(entries) {
     try {
-      localStorage.setItem(this.storageKey, JSON.stringify(ops));
+      localStorage.setItem(this.storageKey, JSON.stringify(entries));
     } catch (e) {
       console.warn('Failed to save pending ops to storage:', e);
     }
   }
 
-  addPendingOp(op) {
-    const ops = this.loadPendingOps();
-    const opDict = typeof op.toDict === 'function' ? op.toDict() : op;
-    ops.push(opDict);
-    this.savePendingOps(ops);
+  addPending(entry) {
+    const entries = this.loadPending();
+    entries.push(entry);
+    this.savePending(entries);
   }
 
-  removeAckedOps(ackedIds) {
+  removeAcked(ackedIds) {
     const ackSet = new Set(ackedIds);
-    const ops = this.loadPendingOps().filter(op => !ackSet.has(op.op_id || op.opId));
-    this.savePendingOps(ops);
-    return ops;
+    const entries = this.loadPending().filter((e) => !ackSet.has(e.op.op_id));
+    this.savePending(entries);
+    return entries;
   }
 
   getLastSeq() {
@@ -59,28 +70,26 @@ class OfflineStorage {
 }
 
 class SyncClient {
-  constructor({
-    url,
-    docId,
-    onOpReceived,
-    onAckReceived,
-    onInitReceived,
-    onPresenceReceived,
-    onStatusChange
-  }) {
-    this.url = url;
-    this.docId = docId || 'default';
+  constructor(options) {
+    this.url = options.url;
+    this.docId = options.docId || 'default';
+    this.siteId = options.siteId || null;
     this.storage = new OfflineStorage(this.docId);
 
-    this.onOpReceived = onOpReceived || (() => {});
-    this.onAckReceived = onAckReceived || (() => {});
-    this.onInitReceived = onInitReceived || (() => {});
-    this.onPresenceReceived = onPresenceReceived || (() => {});
-    this.onStatusChange = onStatusChange || (() => {});
-    this.onAIStatusReceived = arguments[0].onAIStatusReceived || (() => {});
-    this.onMissedSummaryReceived = arguments[0].onMissedSummaryReceived || (() => {});
-    this.onSuggestionReceived = arguments[0].onSuggestionReceived || (() => {});
-    this.onSuggestionUpdated = arguments[0].onSuggestionUpdated || (() => {});
+    const noop = () => {};
+    // onOpsReceived(items) gets each batch [{op, seq}] at once so the editor renders once.
+    this.onOpsReceived = options.onOpsReceived || null;
+    this.onOpReceived = options.onOpReceived || noop;
+    this.onAckReceived = options.onAckReceived || noop;
+    // onInitReceived(msg, pendingEntries, mustRebase) -> {pending, siteId} | undefined
+    this.onInitReceived = options.onInitReceived || noop;
+    this.onPresenceReceived = options.onPresenceReceived || noop;
+    this.onStatusChange = options.onStatusChange || noop;
+    this.onRejected = options.onRejected || noop;
+    this.onAIStatusReceived = options.onAIStatusReceived || noop;
+    this.onMissedSummaryReceived = options.onMissedSummaryReceived || noop;
+    this.onSuggestionReceived = options.onSuggestionReceived || noop;
+    this.onSuggestionUpdated = options.onSuggestionUpdated || noop;
 
     this.socket = null;
     this.isConnected = false;
@@ -98,7 +107,17 @@ class SyncClient {
     this.seenAhead = new Set();
     this.gapTimer = null;
     this.gapRepairDelayMs = 1000;
+
+    // Set when the server rejected one of our ops: the next init rebases everything.
+    this.rebaseRequired = false;
+    this.resyncRequested = false;
+
+    this.stableIntervalMs = 5000;
+    this.lastStableSent = -1;
+    this.stableTimer = null;
   }
+
+  // --- Sequence tracking ---
 
   _markSeq(seq) {
     if (!seq || seq <= this.lastKnownSeq) return;
@@ -122,10 +141,26 @@ class SyncClient {
     this.gapTimer = setTimeout(() => {
       this.gapTimer = null;
       if (this.seenAhead.size > 0) {
-        this.sendSync(this.lastKnownSeq, this.storage.loadPendingOps(), 'gap');
+        this.sendSync(this.lastKnownSeq, this.storage.loadPending(), 'gap');
       }
     }, this.gapRepairDelayMs);
   }
+
+  /** Oldest state any not-yet-acknowledged op of ours is based on (the GC watermark). */
+  stableSeq() {
+    let floor = this.lastKnownSeq;
+    for (const entry of this.storage.loadPending()) floor = Math.min(floor, entry.base_seq || 0);
+    return floor;
+  }
+
+  _reportStable() {
+    const seq = this.stableSeq();
+    if (seq !== this.lastStableSent && this._send({ type: 'stable', seq })) {
+      this.lastStableSent = seq;
+    }
+  }
+
+  // --- Connection lifecycle ---
 
   connect() {
     this.onStatusChange('connecting');
@@ -140,26 +175,18 @@ class SyncClient {
       this.isConnected = true;
       this.reconnectAttempts = 0;
       this.onStatusChange('connected');
-
-      // Send synchronization handshake on connection / reconnection
-      const pendingOps = this.storage.loadPendingOps();
-      this.sendSync(this.lastKnownSeq, pendingOps, 'reconnect');
+      // The server sends `init` right after accepting; the handshake continues there.
+      if (!this.stableTimer && typeof setInterval !== 'undefined') {
+        this.stableTimer = setInterval(() => this._reportStable(), this.stableIntervalMs);
+      }
     };
-
-    this.socket.onclose = () => {
-      this._handleDisconnect();
-    };
-
-    this.socket.onerror = () => {
-      this._handleDisconnect();
-    };
-
+    this.socket.onclose = () => this._handleDisconnect();
+    this.socket.onerror = () => this._handleDisconnect();
     this.socket.onmessage = (event) => {
       try {
-        const msg = JSON.parse(event.data);
-        this._handleMessage(msg);
+        this._handleMessage(JSON.parse(event.data));
       } catch (err) {
-        console.error('Failed to parse WebSocket message:', err);
+        console.error('Failed to handle WebSocket message:', err);
       }
     };
   }
@@ -169,71 +196,78 @@ class SyncClient {
       this.isConnected = false;
       this.onStatusChange('disconnected');
     }
-
+    this.resyncRequested = false;
     if (this.reconnectAttempts < this.maxReconnectAttempts) {
       this.reconnectAttempts++;
-      // Exponential backoff with full jitter
-      const backoff = Math.min(
-        this.baseDelayMs * Math.pow(1.5, this.reconnectAttempts),
-        this.maxDelayMs
-      );
+      const backoff = Math.min(this.baseDelayMs * Math.pow(1.5, this.reconnectAttempts), this.maxDelayMs);
       const jitter = backoff * (0.75 + Math.random() * 0.5);
       setTimeout(() => this.connect(), jitter);
     }
+  }
+
+  // --- Incoming messages ---
+
+  _deliver(items) {
+    if (items.length === 0) return;
+    if (this.onOpsReceived) this.onOpsReceived(items);
+    else for (const item of items) this.onOpReceived(item.op, item.seq);
+    for (const item of items) this._markSeq(item.seq);
+  }
+
+  _requestResync() {
+    this.rebaseRequired = true;
+    if (!this.resyncRequested && this._send({ type: 'resync' })) this.resyncRequested = true;
   }
 
   _handleMessage(msg) {
     const type = msg.type;
 
     if (type === 'init') {
-      if (msg.head_seq !== undefined) {
-        this._resetSeq(msg.head_seq);
+      this.resyncRequested = false;
+      this._resetSeq(msg.head_seq || 0);
+      let pending = this.storage.loadPending();
+      const mustRebase =
+        pending.length > 0 &&
+        (this.rebaseRequired || pending.some((e) => (e.base_seq || 0) < (msg.gc_seq || 0)));
+      const outcome = this.onInitReceived(msg, pending, mustRebase);
+      if (outcome) {
+        pending = outcome.pending;
+        if (outcome.siteId) this.siteId = outcome.siteId;
+        this.storage.savePending(pending);
       }
-      this.onInitReceived(msg);
-
-      // Flush any stored pending ops
-      const pending = this.storage.loadPendingOps();
-      if (pending.length > 0) {
-        this.sendSync(this.lastKnownSeq, pending, 'flush');
-      }
+      this.rebaseRequired = false;
+      this.lastStableSent = -1;
+      this.sendSync(this.lastKnownSeq, pending, 'reconnect');
     } else if (type === 'ack') {
-      const opId = msg.op_id;
-      const sendTime = this.pendingAcks.get(opId);
+      const sendTime = this.pendingAcks.get(msg.op_id);
       let rtt = null;
       if (sendTime) {
         rtt = Math.round(performance.now() - sendTime);
-        this.pendingAcks.delete(opId);
+        this.pendingAcks.delete(msg.op_id);
       }
-
-      this.storage.removeAckedOps([opId]);
+      this.storage.removeAcked([msg.op_id]);
       this._markSeq(msg.seq);
-
       this.onAckReceived(msg, rtt);
     } else if (type === 'ops') {
-      for (const item of msg.ops || []) {
-        this.onOpReceived(item.op, item.seq);
-        this._markSeq(item.seq);
-      }
+      this._deliver(msg.ops || []);
+    } else if (type === 'head') {
+      // Heartbeat reply. If the log is ahead of us, broadcasts were lost (e.g. the
+      // pub/sub layer restarted); recording the head as "seen ahead" schedules a re-sync.
+      this._markSeq(msg.seq);
     } else if (type === 'sync_ack') {
-      // 1. Clear acknowledged operations from offline storage
-      if (msg.acked && Array.isArray(msg.acked)) {
-        this.storage.removeAckedOps(msg.acked);
-        for (const ackedId of msg.acked) {
-          this.pendingAcks.delete(ackedId);
-        }
+      if (Array.isArray(msg.acked)) {
+        this.storage.removeAcked(msg.acked);
+        for (const id of msg.acked) this.pendingAcks.delete(id);
       }
-
-      // 2. Apply missed operations received while offline
-      if (msg.missed && Array.isArray(msg.missed)) {
-        for (const missedItem of msg.missed) {
-          const op = missedItem.op || missedItem;
-          const seq = missedItem.seq || null;
-          this.onOpReceived(op, seq);
-          this._markSeq(seq);
-        }
-      }
-
+      this._deliver((msg.missed || []).map((m) => ({ op: m.op || m, seq: m.seq || null })));
       this.onAckReceived(msg, null);
+      if (Array.isArray(msg.rejected) && msg.rejected.length > 0) {
+        this.onRejected(msg.rejected);
+        this._requestResync();
+      }
+    } else if (type === 'error' && msg.code === 'op_rejected') {
+      this.onRejected([{ op_id: msg.op_id, reason: msg.reason }]);
+      this._requestResync();
     } else if (type === 'presence' || type === 'presence_leave') {
       this.onPresenceReceived(msg);
     } else if (type === 'ai_status') {
@@ -249,89 +283,46 @@ class SyncClient {
     }
   }
 
-  sendAIRequest(requestData) {
-    if (this.isConnected && this.socket && this.socket.readyState === WebSocket.OPEN) {
-      this.socket.send(
-        JSON.stringify({
-          type: 'ai_request',
-          ...requestData
-        })
-      );
-    }
-  }
+  // --- Outgoing messages ---
 
-  sendAICancel(jobId) {
+  _send(payload) {
     if (this.isConnected && this.socket && this.socket.readyState === WebSocket.OPEN) {
-      this.socket.send(
-        JSON.stringify({
-          type: 'ai_cancel',
-          job_id: jobId
-        })
-      );
+      this.socket.send(JSON.stringify(payload));
+      return true;
     }
-  }
-
-  sendSuggestionAccept(suggestionId) {
-    if (this.isConnected && this.socket && this.socket.readyState === WebSocket.OPEN) {
-      this.socket.send(
-        JSON.stringify({
-          type: 'suggestion_accept',
-          suggestion_id: suggestionId
-        })
-      );
-    }
-  }
-
-  sendSuggestionReject(suggestionId) {
-    if (this.isConnected && this.socket && this.socket.readyState === WebSocket.OPEN) {
-      this.socket.send(
-        JSON.stringify({
-          type: 'suggestion_reject',
-          suggestion_id: suggestionId
-        })
-      );
-    }
+    return false;
   }
 
   sendOp(op) {
-    const opDict = typeof op.toDict === 'function' ? op.toDict() : op;
-    const opId = opDict.op_id || opDict.opId;
-
-    this.pendingAcks.set(opId, performance.now());
-    this.storage.addPendingOp(opDict);
-
-    if (this.isConnected && this.socket && this.socket.readyState === WebSocket.OPEN) {
-      this.socket.send(
-        JSON.stringify({
-          type: 'op',
-          op: opDict
-        })
-      );
-    }
+    const entry = { op: typeof op.toDict === 'function' ? op.toDict() : op, base_seq: this.lastKnownSeq };
+    this.pendingAcks.set(entry.op.op_id, performance.now());
+    this.storage.addPending(entry);
+    // While a rebase is pending, new ops wait in storage and go out with the next sync.
+    if (!this.rebaseRequired) this._send({ type: 'op', ...entry });
   }
 
-  sendSync(lastSeq, pendingOps, reason = 'gap') {
-    const payload = {
-      type: 'sync',
-      reason,
-      last_seq: lastSeq,
-      pending: pendingOps.map(op => (typeof op.toDict === 'function' ? op.toDict() : op))
-    };
+  sendSync(lastSeq, pending, reason = 'gap') {
+    this._send({ type: 'sync', reason, site_id: this.siteId, last_seq: lastSeq, pending });
+  }
 
-    if (this.isConnected && this.socket && this.socket.readyState === WebSocket.OPEN) {
-      this.socket.send(JSON.stringify(payload));
-    }
+  sendAIRequest(requestData) {
+    this._send({ type: 'ai_request', ...requestData });
+  }
+
+  sendAICancel(jobId) {
+    this._send({ type: 'ai_cancel', job_id: jobId });
+  }
+
+  sendSuggestionAccept(suggestionId) {
+    this._send({ type: 'suggestion_accept', suggestion_id: suggestionId });
+  }
+
+  sendSuggestionReject(suggestionId) {
+    this._send({ type: 'suggestion_reject', suggestion_id: suggestionId });
   }
 
   sendPresence(presenceData) {
-    if (this.isConnected && this.socket && this.socket.readyState === WebSocket.OPEN) {
-      this.socket.send(
-        JSON.stringify({
-          type: 'presence',
-          ...presenceData
-        })
-      );
-    }
+    this._send({ type: 'presence', ...presenceData });
   }
 }
 

@@ -37,8 +37,13 @@ class CollaborativeEditorApp {
     this.RGA = RGAEngine.RGA;
     this.CharId = RGAEngine.CharId;
     this.ROOT = RGAEngine.ROOT;
+    this.rebasePending = RGAEngine.rebasePending;
 
     this.rga = new this.RGA(this.siteId);
+    // The CRDT counts code points; the textarea counts UTF-16 units. They only differ
+    // when the text contains astral characters (emoji), so the conversion is skipped
+    // otherwise.
+    this.hasAstral = false;
 
     // 2. Initialize Presence Manager with Remote Cursor rendering
     this.presence = new PresenceManager({
@@ -52,9 +57,11 @@ class CollaborativeEditorApp {
     this.sync = new SyncClient({
       url: this.wsUrl,
       docId: this.docId,
-      onInitReceived: (msg) => this._handleInit(msg),
-      onOpReceived: (op, seq) => this._handleRemoteOp(op, seq),
+      onInitReceived: (msg, pending, mustRebase) => this._handleInit(msg, pending, mustRebase),
       onAckReceived: (msg, rtt) => this._handleAck(msg, rtt),
+      siteId: this.siteId,
+      onOpsReceived: (items) => this._handleRemoteOps(items),
+      onRejected: (rejected) => this._handleRejected(rejected),
       onPresenceReceived: (data) => this.presence.handleRemotePresence(data),
       onStatusChange: (status) => this._handleStatusChange(status),
       onAIStatusReceived: (msg) => this._handleAIStatus(msg),
@@ -223,21 +230,10 @@ class CollaborativeEditorApp {
     let startAnchor = null;
     let endAnchor = null;
 
-    if (start > 0 && start <= this.rga.visibleLen()) {
-      try {
-        startAnchor = this.rga.charIdAt(start - 1).toString();
-      } catch (e) {
-        startAnchor = null;
-      }
-    }
-
-    if (end > 0 && end <= this.rga.visibleLen()) {
-      try {
-        endAnchor = this.rga.charIdAt(end - 1).toString();
-      } catch (e) {
-        endAnchor = null;
-      }
-    }
+    const startAnchorId = this._anchorBefore(start);
+    const endAnchorId = this._anchorBefore(end);
+    if (startAnchorId) startAnchor = startAnchorId.toString();
+    if (endAnchorId) endAnchor = endAnchorId.toString();
 
     this.sync.sendAIRequest({
       kind: action,
@@ -344,16 +340,81 @@ class CollaborativeEditorApp {
     }
   }
 
-  _handleInit(msg) {
-    if (msg.snapshot && msg.snapshot.nodes && msg.snapshot.nodes.length > 0) {
-      this.rga = this.RGA.fromDict(msg.snapshot, this.siteId);
+  // --- Text offset helpers (UTF-16 textarea <-> code-point CRDT) ---
+
+  _refreshAstral(text) {
+    this.hasAstral = /[\uD800-\uDFFF]/.test(text);
+  }
+
+  _cpIndex(text, utf16Index) {
+    return this.hasAstral ? Array.from(text.slice(0, utf16Index)).length : utf16Index;
+  }
+
+  _utf16Index(text, cpIndex) {
+    if (!this.hasAstral) return cpIndex;
+    let i = 0;
+    for (let n = 0; n < cpIndex && i < text.length; n++) {
+      i += text.codePointAt(i) > 0xffff ? 2 : 1;
     }
-    this.textarea.value = this.rga.text();
+    return i;
+  }
+
+  /** CharId of the character just before textarea offset `utf16Pos`, or null at the start. */
+  _anchorBefore(utf16Pos) {
+    const cp = this._cpIndex(this.textarea.value, utf16Pos);
+    if (cp <= 0 || cp > this.rga.visibleLen()) return null;
+    return this.rga.charIdAt(cp - 1);
+  }
+
+  /** Textarea offset just after `anchor` (or `fallback` if it was deleted). */
+  _offsetAfter(anchor, fallback) {
+    if (!anchor) return 0;
+    const pos = this.rga.posOfCharId(anchor);
+    if (pos === null) return Math.min(fallback, this.textarea.value.length);
+    return this._utf16Index(this.textarea.value, pos + 1);
+  }
+
+  _render() {
+    const text = this.rga.text();
+    this._refreshAstral(text);
+    this.textarea.value = text;
     this._updateWordCount();
-    if (this.statDocSeq) {
-      this.statDocSeq.textContent = msg.head_seq;
+  }
+
+  // --- Sync callbacks ---
+
+  _handleInit(msg, pending, mustRebase) {
+    const fresh = this.RGA.fromDict(msg.snapshot || {}, this.siteId);
+    let outcome;
+    if (mustRebase) {
+      // Our pending ops were rejected or reference tombstones the server has since
+      // collected. Replay them onto the fresh state under a new site id.
+      const newSiteId = `${this.siteId.split('~')[0]}~${Math.random().toString(36).slice(2, 8)}`;
+      fresh.siteId = newSiteId;
+      const ops = this.rebasePending(this.rga, fresh, pending.map((e) => e.op));
+      outcome = {
+        siteId: newSiteId,
+        pending: ops.map((op) => ({ op: op.toDict(), base_seq: msg.head_seq })),
+      };
+      this.siteId = newSiteId;
+      if (window.toast && pending.length) toast.info('Re-applied your unsynced edits to the latest version');
+    } else {
+      for (const entry of pending) fresh.apply(entry.op);
+      outcome = { pending };
     }
+
+    const selStart = this._anchorBefore(this.textarea.selectionStart);
+    this.rga = fresh;
+    this._render();
+    const pos = this._offsetAfter(selStart, this.textarea.selectionStart);
+    this.textarea.setSelectionRange(pos, pos);
+    if (this.statDocSeq) this.statDocSeq.textContent = msg.head_seq;
     this.presence._updateAllCursorPositions();
+    return outcome;
+  }
+
+  _handleRejected(rejected) {
+    console.warn('Server rejected ops; rebasing:', rejected);
   }
 
   _handleLocalInput() {
@@ -361,92 +422,72 @@ class CollaborativeEditorApp {
 
     const oldText = this.rga.text();
     const newText = this.textarea.value;
-
     if (oldText === newText) return;
 
-    // Find common prefix
-    let prefixLen = 0;
+    // Common prefix / suffix in UTF-16 units, never splitting a surrogate pair.
+    let prefix = 0;
     const minLen = Math.min(oldText.length, newText.length);
-    while (prefixLen < minLen && oldText[prefixLen] === newText[prefixLen]) {
-      prefixLen++;
+    while (prefix < minLen && oldText.charCodeAt(prefix) === newText.charCodeAt(prefix)) prefix++;
+    if (prefix > 0 && /[\uD800-\uDBFF]/.test(oldText[prefix - 1])) prefix--;
+
+    let oldEnd = oldText.length;
+    let newEnd = newText.length;
+    while (oldEnd > prefix && newEnd > prefix && oldText.charCodeAt(oldEnd - 1) === newText.charCodeAt(newEnd - 1)) {
+      oldEnd--;
+      newEnd--;
+    }
+    if (oldEnd < oldText.length && /[\uDC00-\uDFFF]/.test(oldText[oldEnd])) {
+      oldEnd++;
+      newEnd++;
     }
 
-    // Find common suffix
-    let oldSuffixLen = oldText.length - 1;
-    let newSuffixLen = newText.length - 1;
-    while (
-      oldSuffixLen >= prefixLen &&
-      newSuffixLen >= prefixLen &&
-      oldText[oldSuffixLen] === newText[newSuffixLen]
-    ) {
-      oldSuffixLen--;
-      newSuffixLen--;
-    }
+    const astral = this.hasAstral || /[\uD800-\uDFFF]/.test(newText);
+    const cpPos = astral ? Array.from(oldText.slice(0, prefix)).length : prefix;
+    const deleteCount = astral ? Array.from(oldText.slice(prefix, oldEnd)).length : oldEnd - prefix;
+    const inserted = newText.slice(prefix, newEnd);
 
-    const deleteCount = oldSuffixLen - prefixLen + 1;
-    const insertChars = newText.slice(prefixLen, newSuffixLen + 1);
-
-    // 1. Generate local delete operations
-    for (let i = 0; i < deleteCount; i++) {
-      if (prefixLen < this.rga.visibleLen()) {
-        const delOp = this.rga.localDelete(prefixLen);
-        this.sync.sendOp(delOp);
-        this.localOpsCount++;
-      }
-    }
-
-    // 2. Generate local insert operations
-    for (let i = 0; i < insertChars.length; i++) {
-      const char = insertChars[i];
-      const insertPos = prefixLen + i;
-      const insOp = this.rga.localInsert(insertPos, char);
-      this.sync.sendOp(insOp);
+    // One run-length op per side of the edit, however many characters it touches.
+    if (deleteCount > 0) {
+      this.sync.sendOp(this.rga.localDelete(cpPos, deleteCount));
       this.localOpsCount++;
     }
-
-    if (this.statLocalOps) {
-      this.statLocalOps.textContent = this.localOpsCount;
+    if (inserted.length > 0) {
+      this.sync.sendOp(this.rga.localInsert(cpPos, inserted));
+      this.localOpsCount++;
     }
+    this._refreshAstral(newText);
 
+    if (this.statLocalOps) this.statLocalOps.textContent = this.localOpsCount;
     this._handleCursorActivity();
   }
 
-  _handleRemoteOp(opData, seq) {
+  _handleRemoteOps(items) {
     this.isApplyingRemote = true;
 
-    // --- CURSOR ANCHORING ---
-    const cursorPos = this.textarea.selectionStart;
-    let anchorCharId = null;
-    if (cursorPos > 0 && cursorPos <= this.rga.visibleLen()) {
-      try {
-        anchorCharId = this.rga.charIdAt(cursorPos - 1);
-      } catch (e) {
-        anchorCharId = null;
+    // Anchor the selection to characters, not offsets, so remote edits don't move it.
+    const startAnchor = this._anchorBefore(this.textarea.selectionStart);
+    const endAnchor = this._anchorBefore(this.textarea.selectionEnd);
+    const startFallback = this.textarea.selectionStart;
+    const endFallback = this.textarea.selectionEnd;
+
+    let changed = false;
+    let lastSeq = null;
+    for (const { op, seq } of items) {
+      if (this.rga.apply(op)) {
+        changed = true;
+        this.remoteOpsCount++;
       }
+      if (seq) lastSeq = seq;
     }
 
-    // Apply remote CRDT operation
-    const applied = this.rga.apply(opData);
-    if (applied) {
-      this.remoteOpsCount++;
+    if (this.statDocSeq && lastSeq) this.statDocSeq.textContent = lastSeq;
+    if (changed) {
       if (this.statRemoteOps) this.statRemoteOps.textContent = this.remoteOpsCount;
-      if (this.statDocSeq && seq) this.statDocSeq.textContent = seq;
-
-      // Update textarea content
-      this.textarea.value = this.rga.text();
-      this._updateWordCount();
-
-      // Restore cursor position relative to anchored CharId
-      let newCursorPos = 0;
-      if (anchorCharId) {
-        const anchorPos = this.rga.posOfCharId(anchorCharId);
-        newCursorPos = anchorPos !== null ? anchorPos + 1 : cursorPos;
-      } else {
-        newCursorPos = 0;
-      }
-
-      newCursorPos = Math.min(newCursorPos, this.textarea.value.length);
-      this.textarea.setSelectionRange(newCursorPos, newCursorPos);
+      // One re-render per batch, not per op.
+      this._render();
+      const start = this._offsetAfter(startAnchor, startFallback);
+      const end = Math.max(start, this._offsetAfter(endAnchor, endFallback));
+      this.textarea.setSelectionRange(start, end);
       this.presence._updateAllCursorPositions();
     }
 
@@ -464,15 +505,17 @@ class CollaborativeEditorApp {
 
   _handleCursorActivity() {
     const pos = this.textarea.selectionStart;
-    let anchor = null;
-    if (pos > 0 && pos <= this.rga.visibleLen()) {
-      try {
-        anchor = this.rga.charIdAt(pos - 1);
-      } catch (e) {
-        anchor = null;
-      }
+    this.presence.updateLocalCursor(this._anchorBefore(pos), pos, this.username);
+  }
+
+  /** Where a collaborator's cursor is now, from the CharId they reported. */
+  resolveRemoteCursor(anchorString, fallback) {
+    if (!anchorString) return Math.min(fallback || 0, this.textarea.value.length);
+    try {
+      return this._offsetAfter(this.CharId.fromString(anchorString), fallback || 0);
+    } catch (e) {
+      return Math.min(fallback || 0, this.textarea.value.length);
     }
-    this.presence.updateLocalCursor(anchor, pos, this.username);
   }
 }
 
