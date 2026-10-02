@@ -90,7 +90,41 @@ class SyncClient {
     this.maxDelayMs = 10000;
 
     this.pendingAcks = new Map(); // opId -> sentTimestamp
+
+    // Highest seq N such that every op 1..N has been applied locally. Seqs seen
+    // above a hole wait in `seenAhead`; a hole that persists triggers a re-sync,
+    // because the server's pub/sub layer may drop broadcasts under load.
     this.lastKnownSeq = this.storage.getLastSeq();
+    this.seenAhead = new Set();
+    this.gapTimer = null;
+    this.gapRepairDelayMs = 1000;
+  }
+
+  _markSeq(seq) {
+    if (!seq || seq <= this.lastKnownSeq) return;
+    this.seenAhead.add(seq);
+    while (this.seenAhead.has(this.lastKnownSeq + 1)) {
+      this.seenAhead.delete(this.lastKnownSeq + 1);
+      this.lastKnownSeq++;
+    }
+    this.storage.setLastSeq(this.lastKnownSeq);
+    if (this.seenAhead.size > 0) this._scheduleGapRepair();
+  }
+
+  _resetSeq(seq) {
+    this.lastKnownSeq = seq;
+    this.seenAhead.clear();
+    this.storage.setLastSeq(seq);
+  }
+
+  _scheduleGapRepair() {
+    if (this.gapTimer) return;
+    this.gapTimer = setTimeout(() => {
+      this.gapTimer = null;
+      if (this.seenAhead.size > 0) {
+        this.sendSync(this.lastKnownSeq, this.storage.loadPendingOps(), 'gap');
+      }
+    }, this.gapRepairDelayMs);
   }
 
   connect() {
@@ -109,7 +143,7 @@ class SyncClient {
 
       // Send synchronization handshake on connection / reconnection
       const pendingOps = this.storage.loadPendingOps();
-      this.sendSync(this.lastKnownSeq, pendingOps);
+      this.sendSync(this.lastKnownSeq, pendingOps, 'reconnect');
     };
 
     this.socket.onclose = () => {
@@ -153,15 +187,14 @@ class SyncClient {
 
     if (type === 'init') {
       if (msg.head_seq !== undefined) {
-        this.lastKnownSeq = msg.head_seq;
-        this.storage.setLastSeq(this.lastKnownSeq);
+        this._resetSeq(msg.head_seq);
       }
       this.onInitReceived(msg);
 
       // Flush any stored pending ops
       const pending = this.storage.loadPendingOps();
       if (pending.length > 0) {
-        this.sendSync(this.lastKnownSeq, pending);
+        this.sendSync(this.lastKnownSeq, pending, 'flush');
       }
     } else if (type === 'ack') {
       const opId = msg.op_id;
@@ -173,18 +206,14 @@ class SyncClient {
       }
 
       this.storage.removeAckedOps([opId]);
-      if (msg.seq) {
-        this.lastKnownSeq = Math.max(this.lastKnownSeq, msg.seq);
-        this.storage.setLastSeq(this.lastKnownSeq);
-      }
+      this._markSeq(msg.seq);
 
       this.onAckReceived(msg, rtt);
-    } else if (type === 'op') {
-      if (msg.seq) {
-        this.lastKnownSeq = Math.max(this.lastKnownSeq, msg.seq);
-        this.storage.setLastSeq(this.lastKnownSeq);
+    } else if (type === 'ops') {
+      for (const item of msg.ops || []) {
+        this.onOpReceived(item.op, item.seq);
+        this._markSeq(item.seq);
       }
-      this.onOpReceived(msg.op, msg.seq);
     } else if (type === 'sync_ack') {
       // 1. Clear acknowledged operations from offline storage
       if (msg.acked && Array.isArray(msg.acked)) {
@@ -200,12 +229,8 @@ class SyncClient {
           const op = missedItem.op || missedItem;
           const seq = missedItem.seq || null;
           this.onOpReceived(op, seq);
+          this._markSeq(seq);
         }
-      }
-
-      if (msg.head_seq) {
-        this.lastKnownSeq = Math.max(this.lastKnownSeq, msg.head_seq);
-        this.storage.setLastSeq(this.lastKnownSeq);
       }
 
       this.onAckReceived(msg, null);
@@ -285,9 +310,10 @@ class SyncClient {
     }
   }
 
-  sendSync(lastSeq, pendingOps) {
+  sendSync(lastSeq, pendingOps, reason = 'gap') {
     const payload = {
       type: 'sync',
+      reason,
       last_seq: lastSeq,
       pending: pendingOps.map(op => (typeof op.toDict === 'function' ? op.toDict() : op))
     };

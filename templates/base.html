@@ -3,9 +3,19 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Monach Sync — Real-time collaborative editing engine built from first principles with custom CRDT, AI co-authoring, and zero-conflict offline merge.">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="color-scheme" content="dark">
   <title>{% block title %}Monach Sync Engine{% endblock %}</title>
+
+  <!-- Google Fonts: Inter (body), JetBrains Mono (code), Outfit (display) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
+
   {% load static %}
   <link rel="stylesheet" href="{% static 'css/editor.css' %}">
+  <link rel="stylesheet" href="{% static 'css/animations.css' %}">
   {% block extra_head %}{% endblock %}
 </head>
 <body>
@@ -19,19 +29,23 @@
         <span class="nav-user">👤 {{ user.username }}</span>
         <form method="post" action="{% url 'logout' %}" style="display:inline;">
           {% csrf_token %}
-          <button type="submit" class="btn btn-secondary" style="padding:0.35rem 0.75rem;">Logout</button>
+          <button type="submit" class="btn btn-secondary btn-sm">Logout</button>
         </form>
       {% else %}
-        <a href="{% url 'login' %}" class="btn btn-secondary">Login</a>
-        <a href="{% url 'register' %}" class="btn">Register</a>
+        <a href="{% url 'login' %}" class="btn btn-ghost btn-sm">Login</a>
+        <a href="{% url 'register' %}" class="btn btn-sm">Register</a>
       {% endif %}
     </div>
   </nav>
 
-  <main class="container">
+  <main class="{% block main_class %}container{% endblock %}">
     {% block content %}{% endblock %}
   </main>
 
+  <!-- Toast notification container -->
+  <div id="toastContainer" class="toast-container"></div>
+
+  <script src="{% static 'js/toast.js' %}"></script>
   {% block extra_scripts %}{% endblock %}
 </body>
 </html>

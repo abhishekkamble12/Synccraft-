@@ -7,7 +7,6 @@ from django.contrib import admin
 from documents.models import (
     AIJob,
     Collaborator,
-    DocChunk,
     Document,
     Operation,
     Snapshot,
@@ -72,8 +71,3 @@ class AIJobAdmin(admin.ModelAdmin):
 class SuggestionAdmin(admin.ModelAdmin):
     list_display = ("id", "document", "status", "created_at")
     list_filter = ("status",)
-
-
-@admin.register(DocChunk)
-class DocChunkAdmin(admin.ModelAdmin):
-    list_display = ("id", "document", "server_seq", "created_at")

@@ -2,27 +2,59 @@
 
 {% block title %}{{ document.title }} — Monach Sync{% endblock %}
 
+{% block main_class %}container--full{% endblock %}
+
 {% block content %}
 <div class="editor-workspace">
   <!-- Top Bar -->
   <div class="editor-header">
     <div class="editor-title-container">
-      <a href="{% url 'document_list' %}" class="btn btn-secondary" style="padding: 0.35rem 0.65rem;">← Back</a>
-      <span class="editor-title">{{ document.title }}</span>
-      <span class="brand-badge" style="background: var(--bg-tertiary);">Role: {{ user_role }}</span>
+      <a href="{% url 'document_list' %}" class="btn btn-secondary btn-sm">
+        ← Back
+      </a>
+
+      <!-- Editable Document Title -->
+      <div style="display: flex; align-items: center; gap: var(--space-2);">
+        <span class="editor-title" id="editableDocTitle" title="Click to rename">{{ document.title }}</span>
+        <input
+          type="text"
+          id="docTitleInput"
+          class="form-input form-input-sm"
+          value="{{ document.title }}"
+          style="display: none; width: 220px; font-weight: 700; padding: var(--space-1) var(--space-2); font-size: var(--text-base);"
+        >
+        {% if user_role != 'viewer' %}
+          <button type="button" id="editTitleBtn" class="btn btn-ghost btn-xs" title="Rename Document">
+            ✏️
+          </button>
+        {% endif %}
+      </div>
+
+      <span class="badge {% if user_role == 'owner' %}badge-primary{% elif user_role == 'editor' %}badge-success{% else %}badge-secondary{% endif %}">
+        Role: {{ user_role }}
+      </span>
     </div>
 
     <!-- Actions & Active Collaborators Presence -->
-    <div style="display: flex; align-items: center; gap: 1rem;">
+    <div class="editor-actions">
+      <!-- AI Status Pill -->
       <div id="aiStatusPill" class="ai-status-pill" style="display: none;">
+        <span class="ai-status-dot"></span>
         <span id="aiStatusText">AI writing...</span>
-        <button id="cancelAiBtn" class="btn btn-danger btn-xs" style="padding: 0.15rem 0.4rem; font-size: 0.7rem;">Cancel</button>
+        <button type="button" id="cancelAiBtn" class="btn btn-danger btn-xs">Cancel</button>
       </div>
 
-      <button id="historyModalBtn" class="btn btn-secondary" style="padding: 0.35rem 0.75rem;">
-        📜 Version History
+      <!-- Share Collaborators Button -->
+      <button type="button" id="editorShareBtn" class="btn btn-secondary btn-sm" onclick="openEditorShareModal()">
+        👥 Share
       </button>
 
+      <!-- Version History Button -->
+      <button type="button" id="historyModalBtn" class="btn btn-secondary btn-sm">
+        📜 History
+      </button>
+
+      <!-- Live Presence Avatars -->
       <div class="presence-bar" id="presenceBar">
         <!-- Injected dynamically by presence.js -->
       </div>
@@ -30,7 +62,7 @@
   </div>
 
   <!-- Text Editor Container -->
-  <div class="editor-container" id="editorContainer" style="position: relative;">
+  <div class="editor-container" id="editorContainer">
     <!-- Floating AI Context Toolbar for Selected Text -->
     <div id="floatingAiToolbar" class="floating-ai-toolbar">
       <button type="button" data-action="rewrite">✨ Rewrite</button>
@@ -43,7 +75,7 @@
     <textarea
       id="collaborativeEditor"
       class="editor-textarea"
-      placeholder="Start typing simultaneously with other peers..."
+      placeholder="Start typing simultaneously with other peers. Zero-conflict RGA CRDT active..."
       spellcheck="false"
       {% if user_role == 'viewer' %}readonly{% endif %}
     >{{ initial_text }}</textarea>
@@ -57,79 +89,146 @@
     </div>
 
     <div class="stats-group">
+      <div class="stat-item">Words: <span id="statWordCount">0</span></div>
+      <div class="stat-item">Chars: <span id="statCharCount">0</span></div>
       <div class="stat-item">Doc Seq: <span id="statDocSeq">{{ document.head_seq }}</span></div>
       <div class="stat-item">Local Ops: <span id="statLocalOps">0</span></div>
       <div class="stat-item">Remote Ops: <span id="statRemoteOps">0</span></div>
-      <div class="stat-item">RTT Latency: <span id="statLatency">-- ms</span></div>
+      <div class="stat-item">RTT: <span id="statLatency">-- ms</span></div>
     </div>
   </div>
 </div>
 
 <!-- History & Time-Travel Modal -->
-<div id="historyModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 100; align-items: center; justify-content: center;">
-  <div style="background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 0.5rem; width: 90%; max-width: 700px; padding: 1.5rem; display: flex; flex-direction: column; gap: 1.25rem;">
-    <div style="display: flex; justify-content: space-between; align-items: center;">
-      <h3 style="font-size: 1.25rem; font-weight: 700;">Document Version History</h3>
-      <button id="closeHistoryBtn" class="btn btn-secondary" style="padding: 0.25rem 0.5rem;">✕</button>
+<div id="historyModal" class="modal-backdrop">
+  <div class="modal-container modal-container--lg">
+    <div class="modal-header">
+      <div>
+        <h3 class="modal-title">Document Version History</h3>
+        <p class="text-muted" style="font-size: var(--text-xs); margin-top: var(--space-1);">
+          Time-travel scrub through every immutable CRDT operation applied to this document.
+        </p>
+      </div>
+      <button type="button" id="closeHistoryBtn" class="btn btn-ghost btn-sm">✕</button>
     </div>
 
-    <div>
-      <label style="display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem;">
-        <span>Historical Revision Scrubbing:</span>
-        <span>Sequence: <strong id="sliderSeqVal" style="color: var(--accent);">{{ document.head_seq }}</strong> / {{ document.head_seq }}</span>
-      </label>
-      <input
-        type="range"
-        id="historySlider"
-        min="0"
-        max="{{ document.head_seq }}"
-        value="{{ document.head_seq }}"
-        style="width: 100%; accent-color: var(--accent); cursor: pointer;"
-      >
+    <div class="modal-body">
+      <div class="history-slider-container">
+        <div class="history-slider-labels">
+          <span>Historical Revision Scrubbing</span>
+          <span>Sequence: <strong id="sliderSeqVal" class="history-slider-val">{{ document.head_seq }}</strong> / {{ document.head_seq }}</span>
+        </div>
+        <input
+          type="range"
+          id="historySlider"
+          class="history-slider"
+          min="0"
+          max="{{ document.head_seq }}"
+          value="{{ document.head_seq }}"
+        >
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: var(--space-1);">
+        <span class="history-preview-label">Snapshot Preview at Selected Revision (Read-Only):</span>
+        <textarea
+          id="historyPreviewArea"
+          class="history-preview"
+          readonly
+        >{{ initial_text }}</textarea>
+      </div>
     </div>
 
-    <div style="display: flex; flex-direction: column; gap: 0.5rem;">
-      <span style="font-size: 0.8rem; color: var(--text-muted);">Preview at Selected Revision (Read-Only):</span>
-      <textarea
-        id="historyPreviewArea"
-        class="editor-textarea"
-        style="height: 220px; background: var(--bg-primary); border: 1px solid var(--border); border-radius: 0.375rem;"
-        readonly
-      >{{ initial_text }}</textarea>
-    </div>
-
-    <div style="display: flex; justify-content: flex-end; gap: 0.75rem;">
-      <button id="cancelHistoryBtn" class="btn btn-secondary">Close</button>
-      <button id="revertBtn" class="btn btn-danger">⏪ Revert Document to this Version</button>
+    <div class="modal-footer">
+      <button type="button" id="cancelHistoryBtn" class="btn btn-secondary">Close</button>
+      {% if user_role != 'viewer' %}
+        <button type="button" id="revertBtn" class="btn btn-danger">
+          ⏪ Revert Document to Revision
+        </button>
+      {% endif %}
     </div>
   </div>
 </div>
 
-<!-- What Changed While You Were Away Modal (Task 9.1 F2) -->
-<div id="missedSummaryModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 110; align-items: center; justify-content: center;">
-  <div style="background: var(--bg-secondary); border: 1px solid var(--accent); border-radius: 0.5rem; width: 90%; max-width: 550px; padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem;">
-    <div style="display: flex; justify-content: space-between; align-items: center;">
-      <h3 style="font-size: 1.15rem; font-weight: 700; color: #c4b5fd;">✨ What Changed While You Were Away</h3>
-      <button id="closeSummaryBtn" class="btn btn-secondary btn-xs" onclick="document.getElementById('missedSummaryModal').style.display='none'">✕</button>
+<!-- What Changed While You Were Away Modal -->
+<div id="missedSummaryModal" class="modal-backdrop">
+  <div class="modal-container modal-container--md">
+    <div class="modal-header">
+      <div>
+        <h3 class="missed-summary-title">✨ What Changed While You Were Away</h3>
+        <div id="summaryAuthors" class="missed-summary-authors">Edits made by collaborators</div>
+      </div>
+      <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('missedSummaryModal').classList.remove('is-open')">✕</button>
     </div>
-    <div id="summaryAuthors" style="font-size: 0.8rem; color: var(--text-muted);">Edits made by collaborators</div>
-    <div id="summaryBullets" style="font-size: 0.9rem; line-height: 1.5; white-space: pre-line; background: var(--bg-primary); padding: 0.75rem; border-radius: 0.375rem; border: 1px solid var(--border);"></div>
-    <div style="display: flex; justify-content: flex-end;">
-      <button class="btn btn-secondary" onclick="document.getElementById('missedSummaryModal').style.display='none'">Got It</button>
+    <div class="modal-body">
+      <div id="summaryBullets" class="missed-summary-body"></div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" onclick="document.getElementById('missedSummaryModal').classList.remove('is-open')">
+        Got It
+      </button>
     </div>
   </div>
 </div>
 
-<!-- Suggestion Mode Card (Task 9.4 F3) -->
+<!-- AI Suggestion Mode Card -->
 <div id="suggestionCard" class="suggestion-card" style="display: none;">
   <div class="suggestion-header">
     <span>💡 AI Proposed Suggestion</span>
-    <span id="suggestionAuthor" style="font-size: 0.75rem; color: var(--text-muted);">AI Co-Author</span>
+    <span style="font-size: var(--text-xs); color: var(--text-muted);">Ctrl+Enter to accept</span>
   </div>
   <div class="suggestion-body" id="suggestionProposedText"></div>
   <div class="suggestion-actions">
-    <button id="rejectSuggestionBtn" class="btn btn-secondary btn-xs">Discard</button>
-    <button id="acceptSuggestionBtn" class="btn btn-success btn-xs" style="background: var(--success); color: white;">✓ Accept Edit</button>
+    <button type="button" id="rejectSuggestionBtn" class="btn btn-secondary btn-xs">Discard (Esc)</button>
+    <button type="button" id="acceptSuggestionBtn" class="btn btn-success btn-xs">✓ Accept Edit</button>
+  </div>
+</div>
+
+<!-- Share Collaborators Modal inside Editor -->
+<div id="editorShareModal" class="modal-backdrop">
+  <div class="modal-container modal-container--md">
+    <div class="modal-header">
+      <div>
+        <h3 class="modal-title">Share "{{ document.title }}"</h3>
+        <p class="text-muted" style="font-size: var(--text-xs); margin-top: var(--space-1);">Invite collaborators to real-time edit this document</p>
+      </div>
+      <button type="button" class="btn btn-ghost btn-sm" onclick="closeEditorShareModal()">✕</button>
+    </div>
+
+    <div class="modal-body">
+      {% if user_role == 'owner' %}
+        <div style="display: flex; gap: var(--space-2);">
+          <input
+            type="text"
+            id="editorShareUsernameInput"
+            class="form-input"
+            placeholder="Username to invite..."
+            style="flex: 1;"
+          >
+          <select id="editorShareRoleSelect" class="form-input" style="width: 120px;">
+            <option value="editor">Editor</option>
+            <option value="viewer">Viewer</option>
+          </select>
+          <button type="button" class="btn" onclick="submitEditorShareCollaborator()">
+            Invite
+          </button>
+        </div>
+      {% endif %}
+
+      <div>
+        <div style="font-size: var(--text-xs); color: var(--text-muted); font-weight: 600; text-transform: uppercase; margin-bottom: var(--space-2);">
+          Collaborators
+        </div>
+        <div id="editorShareCollaboratorList" class="share-collaborator-list">
+          <div style="text-align: center; color: var(--text-muted); padding: var(--space-4); font-size: var(--text-sm);">
+            Loading...
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" onclick="closeEditorShareModal()">Done</button>
+    </div>
   </div>
 </div>
 {% endblock %}
@@ -165,21 +264,25 @@
     const revertBtn = document.getElementById('revertBtn');
 
     openBtn.addEventListener('click', () => {
-      modal.style.display = 'flex';
+      modal.classList.add('is-open');
       slider.max = window.App.statDocSeq ? window.App.statDocSeq.textContent : '0';
       slider.value = slider.max;
       sliderVal.textContent = slider.value;
       fetchHistoryPreview(slider.value);
     });
 
-    const hideModal = () => { modal.style.display = 'none'; };
+    const hideModal = () => { modal.classList.remove('is-open'); };
     closeBtn.addEventListener('click', hideModal);
     cancelBtn.addEventListener('click', hideModal);
 
+    let debounceTimer = null;
     slider.addEventListener('input', (e) => {
       const seq = e.target.value;
       sliderVal.textContent = seq;
-      fetchHistoryPreview(seq);
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        fetchHistoryPreview(seq);
+      }, 120);
     });
 
     async function fetchHistoryPreview(seq) {
@@ -194,29 +297,133 @@
       }
     }
 
-    revertBtn.addEventListener('click', async () => {
-      const seq = slider.value;
-      if (!confirm(`Are you sure you want to revert the document to revision #${seq}?`)) return;
+    if (revertBtn) {
+      revertBtn.addEventListener('click', async () => {
+        const seq = slider.value;
+        const confirmed = await (window.toast && toast.confirm
+          ? toast.confirm(`Are you sure you want to revert to revision #${seq}?`)
+          : Promise.resolve(confirm(`Are you sure you want to revert to revision #${seq}?`)));
 
-      try {
-        const res = await fetch(`/api/docs/{{ document.id }}/revert/${seq}/`, {
-          method: 'POST',
-          headers: {
-            'X-CSRFToken': config.csrfToken,
-            'Content-Type': 'application/json'
+        if (!confirmed) return;
+
+        try {
+          const res = await fetch(`/api/docs/{{ document.id }}/revert/${seq}/`, {
+            method: 'POST',
+            headers: {
+              'X-CSRFToken': config.csrfToken,
+              'Content-Type': 'application/json'
+            }
+          });
+          const data = await res.json();
+          if (res.ok) {
+            if (window.toast) {
+              toast.success(`Revert complete! Applied ${data.ops_applied} compensating operations.`);
+            }
+            hideModal();
+          } else {
+            if (window.toast) toast.error(data.error || 'Failed to revert.');
           }
-        });
-        const data = await res.json();
-        if (res.ok) {
-          alert(`Revert complete! Applied ${data.ops_applied} compensating operations.`);
-          hideModal();
-        } else {
-          alert(data.error || 'Failed to revert.');
+        } catch (err) {
+          if (window.toast) toast.error('Network error during revert.');
         }
-      } catch (err) {
-        alert('Revert network error.');
-      }
-    });
+      });
+    }
   });
+
+  // Editor Share Modal functions
+  async function openEditorShareModal() {
+    const modal = document.getElementById('editorShareModal');
+    modal.classList.add('is-open');
+    await loadEditorCollaborators();
+  }
+
+  function closeEditorShareModal() {
+    document.getElementById('editorShareModal').classList.remove('is-open');
+  }
+
+  async function loadEditorCollaborators() {
+    const list = document.getElementById('editorShareCollaboratorList');
+    list.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: var(--space-4); font-size: var(--text-sm);">Loading...</div>';
+
+    try {
+      const res = await fetch(`/docs/{{ document.id }}/share/`);
+      if (!res.ok) throw new Error('Failed to load');
+      const data = await res.json();
+
+      if (!data.collaborators || data.collaborators.length === 0) {
+        list.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: var(--space-3); font-size: var(--text-xs);">No external collaborators yet.</div>';
+        return;
+      }
+
+      list.innerHTML = data.collaborators.map(c => `
+        <div class="share-collaborator-item">
+          <div class="share-collaborator-info">
+            <span style="font-weight: 600;">${c.username}</span>
+            <span class="badge ${c.role === 'editor' ? 'badge-primary' : 'badge-secondary'}">${c.role}</span>
+          </div>
+          {% if user_role == 'owner' %}
+            <button type="button" class="btn btn-ghost btn-xs" style="color: var(--danger);" onclick="removeEditorCollaborator('${c.id}')">
+              Remove
+            </button>
+          {% endif %}
+        </div>
+      `).join('');
+    } catch (err) {
+      list.innerHTML = '<div style="color: var(--danger); font-size: var(--text-xs); text-align: center;">Error loading collaborators.</div>';
+    }
+  }
+
+  async function submitEditorShareCollaborator() {
+    const input = document.getElementById('editorShareUsernameInput');
+    const select = document.getElementById('editorShareRoleSelect');
+    const username = input.value.trim();
+    const role = select ? select.value : 'editor';
+
+    if (!username) {
+      if (window.toast) toast.warning('Please enter a username');
+      return;
+    }
+
+    try {
+      const res = await fetch(`/docs/{{ document.id }}/share/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': '{{ csrf_token }}'
+        },
+        body: JSON.stringify({ username, role })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        if (window.toast) toast.success(`Invited ${username} as ${role}`);
+        input.value = '';
+        await loadEditorCollaborators();
+      } else {
+        if (window.toast) toast.error(data.error || 'Failed to invite collaborator');
+      }
+    } catch (err) {
+      if (window.toast) toast.error('Network error inviting collaborator');
+    }
+  }
+
+  async function removeEditorCollaborator(collabId) {
+    try {
+      const res = await fetch(`/docs/{{ document.id }}/share/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': '{{ csrf_token }}'
+        },
+        body: JSON.stringify({ action: 'remove', collab_id: collabId })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        if (window.toast) toast.info('Collaborator removed');
+        await loadEditorCollaborators();
+      }
+    } catch (err) {
+      if (window.toast) toast.error('Failed to remove collaborator');
+    }
+  }
 </script>
 {% endblock %}

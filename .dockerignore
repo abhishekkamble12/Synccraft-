@@ -1,0 +1,16 @@
+.git
+.github
+.venv
+venv
+**/__pycache__
+*.pyc
+*.sqlite3
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.coverage
+coverage.xml
+htmlcov
+node_modules
+docs/benchmarks
+AUDIT.md

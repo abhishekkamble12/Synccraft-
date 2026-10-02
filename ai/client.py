@@ -80,6 +80,8 @@ class OpenAICompatibleLLMClient(BaseLLMClient):
         model: str = "gpt-4o-mini",
     ) -> None:
         self.api_key = api_key or os.environ.get("LLM_API_KEY", "")
+        if not self.api_key:
+            raise ValueError("OpenAICompatibleLLMClient requires LLM_API_KEY.")
         self.base_url = os.environ.get("LLM_BASE_URL", base_url)
         self.model = os.environ.get("LLM_MODEL", model)
 
@@ -89,13 +91,6 @@ class OpenAICompatibleLLMClient(BaseLLMClient):
         system_prompt: str = "",
         max_tokens: int = 1000,
     ) -> AsyncIterator[str]:
-        if not self.api_key:
-            # Fall back to fake client if no API key is provided
-            fake = FakeLLMClient()
-            async for chunk in fake.stream_completion(prompt, system_prompt, max_tokens):
-                yield chunk
-            return
-
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
@@ -118,6 +113,7 @@ class OpenAICompatibleLLMClient(BaseLLMClient):
                 "POST", f"{self.base_url}/chat/completions", headers=headers, json=payload
             ) as response,
         ):
+            response.raise_for_status()
             async for line in response.aiter_lines():
                 if line.startswith("data: ") and not line.startswith("data: [DONE]"):
                     try:
@@ -138,3 +134,10 @@ class OpenAICompatibleLLMClient(BaseLLMClient):
         async for chunk in self.stream_completion(prompt, system_prompt, max_tokens):
             chunks.append(chunk)
         return "".join(chunks)
+
+
+def get_configured_llm_client() -> BaseLLMClient:
+    """Use the real LLM when `LLM_API_KEY` is set, otherwise the deterministic fake."""
+    if os.environ.get("LLM_API_KEY"):
+        return OpenAICompatibleLLMClient()
+    return FakeLLMClient()

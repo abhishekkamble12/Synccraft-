@@ -1,0 +1,26 @@
+{
+  "doc_id": "a4f3872b-e06a-4aa5-87a2-ee7fe013e121",
+  "clients": 25,
+  "ops_sent": 500,
+  "ops_acked": 500,
+  "server_head_seq": 500,
+  "broadcasts_received": 11999,
+  "broadcasts_expected": 12000,
+  "broadcasts_dropped_by_channel_layer": 1,
+  "gap_repairs": 48,
+  "offered_load_ops_per_sec": 239.1,
+  "committed_ops_per_sec": 244.0,
+  "propagation_ms": {
+    "p50": 529.31,
+    "p95": 767.32,
+    "p99": 800.77,
+    "max": 851.42
+  },
+  "ack_rtt_ms": {
+    "p50": 90.97,
+    "p95": 228.21,
+    "p99": 260.56
+  },
+  "converged_with_server": true,
+  "final_doc_len": 361
+}

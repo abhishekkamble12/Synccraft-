@@ -1,163 +1,88 @@
-# ⚡ Real-Time Collaborative Sync Engine (Monach Sync)
+# Real-Time Collaborative Sync Engine
 
-> **A Google Docs-style live collaborative editing engine built from first principles with Django Channels, custom RGA CRDT, and AI co-authoring.**
+A Google-Docs-style collaborative text editor whose consistency layer is built from first principles: a hand-written **RGA sequence CRDT** (Python and JavaScript, no CRDT libraries), a Django Channels WebSocket server with an idempotent offline-sync protocol, a Postgres op log with time-travel and non-destructive revert, and an **AI co-author that edits as just another CRDT peer**.
 
-[![CI & Formal Verification](https://github.com/abhishekkamble12/Monach_AI_Platform/actions/workflows/ci.yml/badge.svg)](https://github.com/abhishekkamble12/Monach_AI_Platform/actions)
-![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)
-![Django 5](https://img.shields.io/badge/django-5.0-green.svg)
-![CRDT RGA](https://img.shields.io/badge/CRDT-RGA%20(Pure%20Python)-orange.svg)
-![License MIT](https://img.shields.io/badge/license-MIT-purple.svg)
+[![CI](https://github.com/abhishekkamble12/Monach_AI_Platform/actions/workflows/ci.yml/badge.svg)](https://github.com/abhishekkamble12/Monach_AI_Platform/actions/workflows/ci.yml)
 
----
+## What's interesting here
 
-## 🎯 Executive Summary
+- **CRDT from scratch, verified two ways.** `crdt/` (strict mypy) and `static/js/rga.js` implement the same RGA. Convergence is checked with exhaustive permutation tests, randomised delivery-order fuzzing and Hypothesis property tests, and the two implementations are held to shared JSON test vectors so the browser and server can never disagree.
+- **Correct with more than one server.** Postgres `SELECT … FOR UPDATE` is the sequencer. Each process's in-memory replica records the last `server_seq` it applied and replays newer rows from the op log before it is read or written, so two Daphne nodes behind nginx stay coherent without sticky sessions ([ADR 005](docs/adr/005-write-path-and-fanout.md)).
+- **Delivery treated as lossy.** Django Channels' layers silently drop broadcasts when a socket's queue fills. The load test caught this: 676 of 1,800 broadcasts lost and clients diverged. Clients now track their highest *contiguous* sequence number and re-sync when a gap persists, so correctness rests on sequence numbers, not on the broker.
+- **Group commit and batched fan-out.** Sockets enqueue ops on a per-document writer that commits whatever has queued as one transaction and broadcasts one frame per batch. At 10 concurrent typists, propagation p50 fell from about 1.5 s (with divergence) to 40 ms with zero divergence.
+- **Offline-first.** Unacked ops persist in `localStorage`. On reconnect the client sends `sync{last_seq, pending}`, the server commits the pending ops idempotently by `op_id` and returns everything missed. A disconnect mid-edit never duplicates or loses characters.
+- **History without rewriting history.** Any past state can be rebuilt from snapshot plus log replay, and revert appends a minimal set of compensating ops, so it merges with concurrent edits ([ADR 003](docs/adr/003-revert-as-new-ops.md)).
+- **AI as a CRDT peer.** The co-author gets its own `site_id`, anchors its target range by `CharId`, validates the model's output, then diffs it into ops that merge with concurrent human typing ([ADR 004](docs/adr/004-ai-as-crdt-peer.md)). Prompt-injection heuristics, delimiter escaping, rate limits and token budgets live in `ai/guards.py`.
+- **Deny-by-default access.** Owner/editor/viewer roles are enforced on every HTTP view and WebSocket message, inaccessible documents return 404, and WebSocket upgrades are `Origin`-checked against cross-site hijacking.
 
-Most web developers consume sync engines as black-box SaaS products (Firebase, Liveblocks). This project builds the **distributed consistency and conflict resolution logic from first principles**:
-- **Zero CRDT libraries:** Standalone, pure-Python and JavaScript Replicated Growable Array (RGA) CRDT.
-- **Formal mathematical proof:** 10,000+ permutations and Hypothesis property-based tests verifying commutativity, associativity, and idempotency.
-- **Resilient offline editing:** Edits made offline persist in client storage and merge conflict-free upon reconnection with zero data loss or duplicate characters.
-- **Non-destructive version travel:** Revert to any historical point in time via forward compensating operations without erasing log history.
-- **Horizontal scale:** Multi-process ASGI Daphne cluster synchronized across Redis pub/sub channels.
+## Measured performance
 
----
+Single Daphne process, SQLite, in-memory channel layer, with the load generator on the **same laptop** (Ryzen 5 5600H, 6C/12T, Windows 11). Every client types at 7–20 keystrokes/s (15% deletes) into one shared document, and the run fails unless every client replica *and* the server end up byte-identical. Medians of 3 runs ([method and raw JSON](docs/BENCHMARKS.md)).
 
-## 📊 Performance Benchmarks
+| Concurrent typists | Committed ops/s | Edit propagation p50 / p95 / p99 | Converged |
+|---:|---:|---|:---:|
+| 5 | 47 | 24 / 34 / 35 ms | 3/3 runs |
+| 10 | 102 | 40 / 64 / 72 ms | 3/3 runs |
+| 25 | 244 | 529 / 767 / 801 ms | 3/3 runs |
+| 50 | 282 (saturated) | 2.2 / 3.3 / 3.4 s | 3/3 runs |
 
-| Metric | 50 Concurrent Clients | 100 Concurrent Clients | 200 Concurrent Clients |
-| :--- | :--- | :--- | :--- |
-| **Throughput** | 142.8 ops/sec | 284.6 ops/sec | **462.1 ops/sec** |
-| **p50 Propagation** | 18.4 ms | 24.2 ms | **38.6 ms** |
-| **p95 Propagation** | 32.1 ms | 46.8 ms | **72.4 ms** |
-| **p99 Propagation** | 49.5 ms | 68.3 ms | **114.2 ms** |
-| **Convergence** | **100.0%** | **100.0%** | **100.0%** |
-| **Divergence** | **0 characters** | **0 characters** | **0 characters** |
+Up to about 10 simultaneous typists in one document, edits reach every peer in tens of milliseconds. Beyond that, a single Python process saturates at about 250–280 committed ops/s. Latency then grows, but every run still converges. CI runs the same load test against the two-node Postgres + Redis cluster on every push.
 
-*Hardware: 8 vCPU, 16 GB RAM, 2 Daphne workers behind Nginx + Redis 7 + PostgreSQL 16.*
-
----
-
-## 🏗️ Architecture Overview
+## Architecture
 
 ```
-                        ┌────────────────────────────────────────┐
-                        │            Nginx Load Balancer         │
-                        │            (port 80 / Reverse Proxy)   │
-                        └───────────────────┬────────────────────┘
-                                            │
-                    ┌───────────────────────┴───────────────────────┐
-                    ▼                                               ▼
-         ┌─────────────────────┐                         ┌─────────────────────┐
-         │  Daphne ASGI Web 1  │                         │  Daphne ASGI Web 2  │
-         │  (Django Channels)  │                         │  (Django Channels)  │
-         └──────────┬──────────┘                         └──────────┬──────────┘
-                    │                                               │
-                    └───────────────────────┬───────────────────────┘
-                                            │
-                     ┌──────────────────────┴──────────────────────┐
-                     ▼                                             ▼
-        ┌─────────────────────────┐                   ┌─────────────────────────┐
-        │     Redis 7 Broker      │                   │     PostgreSQL 16       │
-        │  • Channel Layer Pub/Sub│                   │  • Operation Log (seq)  │
-        │  • Celery Task Queue    │                   │  • Snapshots (every 500)│
-        │  • Ephemeral Presence   │                   │  • pgvector Embeddings  │
-        └─────────────────────────┘                   └─────────────────────────┘
+browser (rga.js, sync.js) ──WS──► nginx ──► Daphne × 2 ──► per-doc group-commit writer
+                                               │                   │
+                                     Redis channel layer     PostgreSQL op log
+                                     (fan-out, Celery)       (row-lock sequencing, snapshots)
+                                               │
+                                        Celery worker (AI co-author)
 ```
 
----
+Protocol, data flow and security model: [docs/DESIGN.md](docs/DESIGN.md). Design decisions: [docs/adr/](docs/adr/).
 
-## 🧠 How the RGA CRDT Works
+## Run it
 
-1. **Character Identity (`CharId`):** Each character is assigned an immutable ID `(lamport_clock, site_id)`.
-2. **Deterministic Total Ordering:** When multiple clients insert characters after the same predecessor simultaneously, the character with the higher `lamport_clock` is placed first. Ties are broken lexicographically by `site_id`.
-3. **Idempotency Keys (`op_id`):** Every operation carries a globally unique UUID. Applying an operation multiple times (e.g. on network retry) is a safe no-op.
-4. **Tombstone Deletions:** Deleting a character marks it as a tombstone (`deleted = True`) without removing the node, preserving causal coordinate anchors for concurrent operations.
-5. **Cursor Anchoring:** The frontend editor anchors the local text cursor to the preceding `CharId` before applying incoming remote operations, completely eliminating the "jumping cursor" problem.
-
----
-
-## 🛡️ Failure & Chaos Handling
-
-- **Disconnect Mid-Edit:** If a network drops after sending an edit before receiving an acknowledgement, the client retransmits upon reconnecting. The server detects the existing `op_id` and cleanly acknowledges without duplicating state (`test_disconnect_mid_edit_no_duplicate_or_loss`).
-- **Offline Concurrent Editing:** Multiple clients can go offline, edit different or identical sections of text, and reconnect. Both replicas merge cleanly and converge (`test_offline_concurrent_editing_merges_on_reconnect`).
-- **Server Crash & Restart:** All document state is completely reconstructed on-demand from PostgreSQL snapshots and append-only operation logs (`test_server_crash_recovery_from_database`).
-
----
-
-## 🤖 AI Co-Author as a First-Class CRDT Peer
-
-Unlike naive implementations that lock the entire document or overwrite human edits, Monach Sync integrates Generative AI as an **autonomous CRDT peer (`AIPeer`)**:
-- **Zero Document Locking:** Humans can edit the exact same paragraph while the AI is actively streaming; CRDT total ordering merges both streams mathematically without dropped characters (`test_ai_and_human_concurrent_edits_converge`).
-- **Diff-to-Op Decomposition:** Tokens streamed from the LLM are diffed against the anchor selection range (`anchor_start`, `anchor_end`) and converted into atomic CRDT insert/delete operations.
-- **"What Changed While You Were Away" (F2):** When reconnecting after being away, clients with > 20 missed operations receive an automated LLM-generated 3-bullet summary of changes with contributor attribution.
-- **Suggestion Mode (F3):** Review AI proposed improvements in an inline diff card before accepting or discarding without directly mutating the live CRDT state.
-- **Enterprise Guardrails:** Prompt injection detection patterns, XML delimiter neutralization (`&lt;/document_text&gt;`), sliding-window rate limits, and daily token budgets (`ai/guards.py`).
-- **30-Case Evals Benchmark:** Automated scoring harness (`ai/evals/runner.py`) achieving 96.7% pass rate across rewriting, grammar, shortening, and safety scenarios.
-
----
-
-## 🚀 Quickstart & Local Setup
-
-### Option 1: One-Command Docker Setup (Recommended)
+**Full stack (two web nodes, Postgres, Redis, Celery, nginx):**
 
 ```bash
-# Clone the repository
-git clone https://github.com/abhishekkamble12/Monach_AI_Platform.git
-cd Monach_AI_Platform
-
-# Start multi-node cluster (Nginx + 2 Daphne Web Nodes + Redis + PostgreSQL)
 docker compose up --build
+# open http://localhost:8080, register, create a doc, and open it in two windows
 ```
-Open **http://localhost** in two different browser tabs and start typing simultaneously!
 
----
-
-### Option 2: Local Python Virtualenv Setup
+**Local, no Docker (single process, SQLite, in-memory channel layer, AI jobs in-process):**
 
 ```bash
-# 1. Create and activate virtual environment
-python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\Activate.ps1
-
-# 2. Install dependencies
+python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\Activate.ps1
 pip install -r requirements-dev.txt
-
-# 3. Start Redis & Postgres (via Docker)
-docker compose up -d redis postgres
-
-# 4. Apply database migrations
+export DEBUG=1                                       # PowerShell: $env:DEBUG=1
 python manage.py migrate
-
-# 5. Run the ASGI server
 daphne -b 127.0.0.1 -p 8000 config.asgi:application
 ```
 
----
+Set `LLM_API_KEY` (and optionally `LLM_BASE_URL` / `LLM_MODEL`) for a real OpenAI-compatible model. Without it, AI features use a deterministic fake.
 
-## 🧪 Running the Verification Test Suite
+## Tests
 
 ```bash
-# Run full unit, integration, and convergence test suite with coverage
-pytest --cov=crdt --cov-report=term-missing tests/
+pytest                                   # 76 tests: CRDT properties, services, WebSocket protocol,
+                                         # permissions, group commit, multi-node cache coherence, AI peer
+python -m tests.vectors.generate_vectors
+node --test tests/vectors/test_rga_js.mjs tests/js/test_sync_gaps.mjs
 
-# Run JavaScript CRDT port verification against shared JSON test vectors
-node --test tests/vectors/test_rga_js.mjs
-
-# Run async load test swarm (50 clients)
-python -m loadtest.swarm --clients 50 --ops 20 --url ws://127.0.0.1:8000
+python -m loadtest.swarm --url http://127.0.0.1:8000 --clients 10 --ops 20
+python -m ai.evals.runner                # guardrail/format evals (deterministic fake model)
+LLM_API_KEY=... python -m ai.evals.runner --live
 ```
 
----
+The eval runner only scores properties it can check deterministically. Semantic expectations (tone, meaning) are reported as `unchecked` rather than counted as passes. With the fake model, 27/30 cases pass, including all 6 security cases. The 3 failures expect bullets or longer text, which a canned response can't produce.
 
-## 💼 Resume Ready Bullets (with Real Metrics)
+## Limitations
 
-- **Engineered a distributed collaborative sync engine from scratch** in Python 3.12, Django Channels, and Redis, implementing a custom Replicated Growable Array (RGA) CRDT with Lamport logical clocks and O(1) hash indexing without external CRDT libraries.
-- **Formally verified mathematical convergence** across 10,000+ randomized permutations and Hypothesis property tests, proving strict commutativity, associativity, and idempotency across concurrent replicas.
-- **Architected autonomous AI Co-Author (`AIPeer`) as a first-class CRDT peer**, enabling real-time streaming LLM edits concurrent with human typing with 0 dropped characters and 0 document locks.
-- **Built an idempotent offline-first sync protocol** with exponential backoff and browser local storage, merging disconnected offline sessions and surviving abrupt drops with zero duplicate operations.
-- **Demonstrated horizontal scalability** supporting 200 concurrent active WebSocket clients with 462.1 ops/sec throughput and 38.6ms p50 (72.4ms p95) propagation latency on a 2-node Daphne cluster behind Nginx.
-- **Created non-destructive time-travel version control** allowing instant state replay at any historical sequence and atomic forward-compensating reverts without rewriting operation logs.
+- Tombstones are never garbage-collected (snapshots bound replay time, not memory).
+- One Python process tops out at about 250–280 ops/s per document on a laptop; the next step is spreading documents across more processes.
+- The AI applies its edit when generation finishes rather than streaming text into the document.
+- Presence is ephemeral.
 
----
-
-## 📜 License
-MIT License. Open source for educational and portfolio demonstration.
+## License
+MIT

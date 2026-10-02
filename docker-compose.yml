@@ -1,9 +1,39 @@
+# Two Daphne nodes behind nginx, sharing Postgres (op log, row-lock sequencing)
+# and Redis (channel layer fan-out, Celery broker, rate-limit cache).
+#
+#   docker compose up --build        -> http://localhost:8080
+
+x-app-env: &app-env
+  DEBUG: "False"
+  SECRET_KEY: ${SECRET_KEY:-local-compose-only-change-me}
+  ALLOWED_HOSTS: localhost,127.0.0.1
+  CSRF_TRUSTED_ORIGINS: http://localhost:8080,http://127.0.0.1:8080
+  SECURE_COOKIES: "False" # plain HTTP on localhost
+  SERVE_STATIC: "True"
+  DB_ENGINE: postgresql
+  DB_HOST: postgres
+  DB_NAME: collaborative_sync
+  DB_USER: postgres
+  DB_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+  REDIS_URL: redis://redis:6379/0
+  LLM_API_KEY: ${LLM_API_KEY:-}
+
+x-app: &app
+  build: .
+  environment: *app-env
+  depends_on:
+    redis:
+      condition: service_healthy
+    postgres:
+      condition: service_healthy
+    migrate:
+      condition: service_completed_successfully
+
 services:
   nginx:
-    image: nginx:alpine
-    container_name: colab_nginx
+    image: nginx:1.27-alpine
     ports:
-      - "80:80"
+      - "8080:80"
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
@@ -12,112 +42,47 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: colab_redis
     ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
+      - "127.0.0.1:6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
+      interval: 3s
       timeout: 3s
-      retries: 5
+      retries: 10
 
   postgres:
-    image: pgvector/pgvector:pg16
-    container_name: colab_postgres
+    image: postgres:16-alpine
     environment:
       POSTGRES_DB: collaborative_sync
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgrespassword
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d collaborative_sync"]
-      interval: 5s
+      interval: 3s
       timeout: 3s
-      retries: 5
+      retries: 10
+
+  migrate:
+    build: .
+    command: python manage.py migrate --noinput
+    environment: *app-env
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   web_1:
-    build: .
-    container_name: colab_web_1
-    command: daphne -b 0.0.0.0 -p 8000 config.asgi:application
-    volumes:
-      - .:/app
-    environment:
-      - DEBUG=True
-      - SECRET_KEY=django-insecure-dev-key-change-in-production
-      - DB_ENGINE=postgresql
-      - DB_NAME=collaborative_sync
-      - DB_USER=postgres
-      - DB_PASSWORD=postgrespassword
-      - DB_HOST=postgres
-      - DB_PORT=5432
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - REDIS_URL=redis://redis:6379/0
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
-    depends_on:
-      redis:
-        condition: service_healthy
-      postgres:
-        condition: service_healthy
+    <<: *app
 
   web_2:
-    build: .
-    container_name: colab_web_2
-    command: daphne -b 0.0.0.0 -p 8000 config.asgi:application
-    volumes:
-      - .:/app
-    environment:
-      - DEBUG=True
-      - SECRET_KEY=django-insecure-dev-key-change-in-production
-      - DB_ENGINE=postgresql
-      - DB_NAME=collaborative_sync
-      - DB_USER=postgres
-      - DB_PASSWORD=postgrespassword
-      - DB_HOST=postgres
-      - DB_PORT=5432
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - REDIS_URL=redis://redis:6379/0
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
-    depends_on:
-      redis:
-        condition: service_healthy
-      postgres:
-        condition: service_healthy
+    <<: *app
 
   celery_worker:
-    build: .
-    container_name: colab_celery_worker
-    command: celery -A config worker -l info
-    volumes:
-      - .:/app
-    environment:
-      - DEBUG=True
-      - SECRET_KEY=django-insecure-dev-key-change-in-production
-      - DB_ENGINE=postgresql
-      - DB_NAME=collaborative_sync
-      - DB_USER=postgres
-      - DB_PASSWORD=postgrespassword
-      - DB_HOST=postgres
-      - DB_PORT=5432
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - REDIS_URL=redis://redis:6379/0
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
-    depends_on:
-      redis:
-        condition: service_healthy
-      postgres:
-        condition: service_healthy
+    <<: *app
+    command: celery -A config worker -l info --concurrency 2
 
 volumes:
   postgres_data:
-  redis_data:

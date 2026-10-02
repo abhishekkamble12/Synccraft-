@@ -187,21 +187,3 @@ class Suggestion(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
-
-
-class DocChunk(models.Model):
-    """
-    Text chunk for semantic search and RAG retrieval.
-    """
-
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    document = models.ForeignKey(Document, on_delete=models.CASCADE, related_name="chunks")
-    server_seq = models.BigIntegerField()
-    text = models.TextField()
-    embedding = models.JSONField(null=True, blank=True, help_text="Vector embedding list of floats")
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        indexes = [
-            models.Index(fields=["document", "server_seq"]),
-        ]

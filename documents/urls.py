@@ -10,7 +10,9 @@ from documents.views import (
     DocumentDeleteView,
     DocumentEditorView,
     DocumentListView,
+    DocumentRenameView,
     RegisterView,
+    ShareDocumentView,
 )
 from documents.views_history import (
     DocumentHistoryApiView,
@@ -24,6 +26,8 @@ urlpatterns = [
     path("docs/create/", DocumentCreateView.as_view(), name="document_create"),
     path("docs/<uuid:doc_id>/", DocumentEditorView.as_view(), name="document_editor"),
     path("docs/<uuid:doc_id>/delete/", DocumentDeleteView.as_view(), name="document_delete"),
+    path("docs/<uuid:doc_id>/share/", ShareDocumentView.as_view(), name="document_share"),
+    path("docs/<uuid:doc_id>/rename/", DocumentRenameView.as_view(), name="document_rename"),
     # REST History & Time-Travel APIs
     path(
         "api/docs/<uuid:doc_id>/history/", DocumentHistoryApiView.as_view(), name="api_doc_history"

@@ -87,17 +87,23 @@ def test_sync_client_state_reconnect() -> None:
     c4 = CharId(10, "client_offline")
     op_offline = Op.create_insert("client_offline", 10, c4, c1, "Z")
 
-    missed_ops, acked_ids, head_seq = sync_client_state(
+    result = sync_client_state(
         doc_id=doc.id,
         last_seq=1,
         pending_ops=[op_offline],
         user=user,
     )
 
-    # Should receive missed ops (seq 2 & 3), acked offline op (seq 4), and new head_seq=4
-    assert len(missed_ops) == 2
-    assert op_offline.op_id in acked_ids
-    assert head_seq == 4
+    # Missed ops are seq 2, 3 plus the client's own op persisted as seq 4
+    assert [m["seq"] for m in result.missed] == [2, 3, 4]
+    assert op_offline.op_id in result.acked
+    assert result.head_seq == 4
+    assert [seq for seq, _ in result.newly_applied] == [4]
+
+    # Replaying the same sync is idempotent: nothing new is persisted or broadcast
+    again = sync_client_state(doc.id, last_seq=4, pending_ops=[op_offline], user=user)
+    assert again.newly_applied == []
+    assert again.head_seq == 4
 
 
 @pytest.mark.django_db

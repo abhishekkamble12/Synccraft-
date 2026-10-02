@@ -5,57 +5,75 @@ REST API endpoints for document history, state-at-sequence time travel, and non-
 import uuid
 from typing import Any
 
-from asgiref.sync import async_to_sync
-from channels.layers import get_channel_layer
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.http import HttpRequest, JsonResponse
+from django.http import Http404, HttpRequest, JsonResponse
 from django.shortcuts import get_object_or_404
 from django.views import View
 
 from documents.models import Document, Operation
+from documents.permissions import can_edit, get_role
 from documents.services import (
-    apply_operation,
+    apply_operations,
+    broadcast_ops,
     generate_revert_operations,
-    get_or_load_document_rga,
+    get_document_state,
     reconstruct_state_at_seq,
 )
+
+HISTORY_PAGE_SIZE = 500
+
+
+def _get_accessible_document(request: HttpRequest, doc_id: uuid.UUID) -> tuple[Document, str]:
+    doc = get_object_or_404(Document, id=doc_id)
+    role = get_role(doc, request.user)
+    if role is None:
+        # 404 rather than 403 so document ids cannot be probed.
+        raise Http404("Document not found")
+    return doc, role
 
 
 class DocumentHistoryApiView(LoginRequiredMixin, View):
     """
-    GET /api/docs/<doc_id>/history/
-    Returns operation history grouped by user and time windows.
+    GET /api/docs/<doc_id>/history/?after=<seq>
+    Returns a page of the operation log, oldest first.
     """
 
     def get(self, request: HttpRequest, doc_id: uuid.UUID) -> JsonResponse:
-        doc = get_object_or_404(Document, id=doc_id)
+        doc, _ = _get_accessible_document(request, doc_id)
+        try:
+            after = max(0, int(request.GET.get("after", 0)))
+        except ValueError:
+            return JsonResponse({"error": "'after' must be an integer"}, status=400)
 
-        # Fetch operations
         ops_qs = (
-            Operation.objects.filter(document=doc).select_related("user").order_by("server_seq")
+            Operation.objects.filter(document=doc, server_seq__gt=after)
+            .select_related("user")
+            .order_by("server_seq")[:HISTORY_PAGE_SIZE]
         )
 
-        history_entries: list[dict[str, Any]] = []
-        for op in ops_qs:
-            history_entries.append(
-                {
-                    "seq": op.server_seq,
-                    "op_id": op.op_id,
-                    "type": op.type,
-                    "site_id": op.site_id,
-                    "user": op.user.username if op.user else "Anonymous",
-                    "timestamp": op.created_at.isoformat(),
-                    "char": op.payload.get("char") if op.type == "insert" else None,
-                }
-            )
+        history_entries: list[dict[str, Any]] = [
+            {
+                "seq": op.server_seq,
+                "op_id": op.op_id,
+                "type": op.type,
+                "site_id": op.site_id,
+                "user": op.user.username if op.user else "system",
+                "timestamp": op.created_at.isoformat(),
+                "char": op.payload.get("char") if op.type == "insert" else None,
+            }
+            for op in ops_qs
+        ]
 
         return JsonResponse(
             {
                 "doc_id": str(doc.id),
                 "title": doc.title,
                 "head_seq": doc.head_seq,
-                "total_ops": len(history_entries),
+                "total_ops": doc.head_seq,
                 "history": history_entries,
+                "next_after": history_entries[-1]["seq"]
+                if len(history_entries) == HISTORY_PAGE_SIZE
+                else None,
             }
         )
 
@@ -67,7 +85,7 @@ class DocumentStateAtSeqApiView(LoginRequiredMixin, View):
     """
 
     def get(self, request: HttpRequest, doc_id: uuid.UUID, seq: int) -> JsonResponse:
-        doc = get_object_or_404(Document, id=doc_id)
+        doc, _ = _get_accessible_document(request, doc_id)
 
         if seq < 0 or seq > doc.head_seq:
             return JsonResponse(
@@ -96,7 +114,9 @@ class DocumentRevertApiView(LoginRequiredMixin, View):
     """
 
     def post(self, request: HttpRequest, doc_id: uuid.UUID, seq: int) -> JsonResponse:
-        doc = get_object_or_404(Document, id=doc_id)
+        doc, role = _get_accessible_document(request, doc_id)
+        if not can_edit(role):
+            return JsonResponse({"error": "Viewers cannot revert documents."}, status=403)
 
         if seq < 0 or seq > doc.head_seq:
             return JsonResponse(
@@ -104,48 +124,36 @@ class DocumentRevertApiView(LoginRequiredMixin, View):
                 status=400,
             )
 
-        site_id = f"revert_{request.user.id}_{uuid.uuid4().hex[:6]}"
+        site_id = f"revert_{request.user.pk}_{uuid.uuid4().hex[:6]}"
         compensating_ops = generate_revert_operations(doc.id, target_seq=seq, site_id=site_id)
 
         if not compensating_ops:
             return JsonResponse(
                 {
+                    "success": True,
                     "message": f"Document is already in the target state of sequence {seq}.",
-                    "head_seq": doc.head_seq,
+                    "new_head_seq": doc.head_seq,
                     "ops_applied": 0,
+                    "current_text": get_document_state(doc.id).text,
                 }
             )
 
-        channel_layer = get_channel_layer()
-        group_name = f"doc_{doc.id}"
-        applied_count = 0
+        results = apply_operations(doc.id, compensating_ops, user=request.user)  # type: ignore[arg-type]
+        applied = [
+            (new_seq, op)
+            for op, (new_seq, is_new) in zip(compensating_ops, results, strict=True)
+            if is_new
+        ]
+        broadcast_ops(doc.id, applied, sender_channel="revert_api")
 
-        # Apply each compensating op and broadcast to active editors
-        for op in compensating_ops:
-            new_seq, newly_applied = apply_operation(doc.id, op, user=request.user)
-            if newly_applied:
-                applied_count += 1
-                if channel_layer:
-                    async_to_sync(channel_layer.group_send)(
-                        group_name,
-                        {
-                            "type": "doc.op",
-                            "op": op.to_dict(),
-                            "seq": new_seq,
-                            "sender_channel": "revert_api",
-                        },
-                    )
-
-        doc.refresh_from_db(fields=["head_seq"])
-        current_rga = get_or_load_document_rga(doc.id)
-
+        state = get_document_state(doc.id)
         return JsonResponse(
             {
                 "success": True,
                 "message": f"Successfully reverted to sequence {seq}.",
                 "target_seq": seq,
-                "new_head_seq": doc.head_seq,
-                "ops_applied": applied_count,
-                "current_text": current_rga.text(),
+                "new_head_seq": state.seq,
+                "ops_applied": len(applied),
+                "current_text": state.text,
             }
         )

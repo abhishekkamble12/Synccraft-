@@ -1,5 +1,6 @@
 /**
- * Main Collaborative Editor Controller with Textarea Diffing and Cursor Anchoring.
+ * Main Collaborative Editor Controller with Textarea Diffing, Cursor Anchoring,
+ * Selection-Aware AI Floating Toolbar, Word/Character Counters, and Toast Notifications.
  */
 
 class CollaborativeEditorApp {
@@ -9,6 +10,7 @@ class CollaborativeEditorApp {
     this.username = config.username;
     this.userRole = config.userRole;
     this.wsUrl = config.wsUrl;
+    this.csrfToken = config.csrfToken;
 
     this.textarea = document.getElementById('collaborativeEditor');
     this.statusDot = document.getElementById('connectionDot');
@@ -38,10 +40,11 @@ class CollaborativeEditorApp {
 
     this.rga = new this.RGA(this.siteId);
 
-    // 2. Initialize Presence Manager
+    // 2. Initialize Presence Manager with Remote Cursor rendering
     this.presence = new PresenceManager({
       containerId: 'editorContainer',
       barId: 'presenceBar',
+      textareaId: 'collaborativeEditor',
       onBroadcastPresence: (data) => this.sync.sendPresence(data)
     });
 
@@ -60,20 +63,31 @@ class CollaborativeEditorApp {
       onSuggestionUpdated: (msg) => this._handleSuggestionUpdated(msg)
     });
 
-    // 4. Attach Event Listeners
+    // 4. Attach Event Listeners & Title Editor
     this._attachEventListeners();
+    this._initTitleEditor();
+    this._updateWordCount();
 
     // 5. Connect
     this.sync.connect();
   }
 
   _attachEventListeners() {
-    this.textarea.addEventListener('input', () => this._handleLocalInput());
+    this.textarea.addEventListener('input', () => {
+      this._handleLocalInput();
+      this._updateWordCount();
+      this.presence._updateAllCursorPositions();
+    });
+
     this.textarea.addEventListener('keyup', () => {
       this._handleCursorActivity();
       this._handleSelectionChange();
     });
-    this.textarea.addEventListener('mouseup', () => this._handleSelectionChange());
+
+    this.textarea.addEventListener('mouseup', () => {
+      this._handleSelectionChange();
+    });
+
     this.textarea.addEventListener('click', () => {
       this._handleCursorActivity();
       this._handleSelectionChange();
@@ -97,6 +111,92 @@ class CollaborativeEditorApp {
         });
       });
     }
+
+    // Keyboard shortcuts for suggestion card
+    window.addEventListener('keydown', (e) => {
+      if (this.suggestionCard && this.suggestionCard.style.display !== 'none') {
+        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+          e.preventDefault();
+          const acceptBtn = document.getElementById('acceptSuggestionBtn');
+          if (acceptBtn) acceptBtn.click();
+        } else if (e.key === 'Escape') {
+          const rejectBtn = document.getElementById('rejectSuggestionBtn');
+          if (rejectBtn) rejectBtn.click();
+        }
+      }
+    });
+  }
+
+  _initTitleEditor() {
+    const titleEl = document.getElementById('editableDocTitle');
+    const inputEl = document.getElementById('docTitleInput');
+    const editBtn = document.getElementById('editTitleBtn');
+    if (!titleEl || !inputEl) return;
+
+    const startEdit = () => {
+      if (this.userRole === 'viewer') return;
+      titleEl.style.display = 'none';
+      if (editBtn) editBtn.style.display = 'none';
+      inputEl.style.display = 'inline-block';
+      inputEl.value = titleEl.textContent.trim();
+      inputEl.focus();
+      inputEl.select();
+    };
+
+    const saveEdit = async () => {
+      const newTitle = inputEl.value.trim();
+      inputEl.style.display = 'none';
+      titleEl.style.display = 'inline-block';
+      if (editBtn) editBtn.style.display = 'inline-flex';
+
+      if (!newTitle || newTitle === titleEl.textContent.trim()) return;
+
+      try {
+        const res = await fetch(`/docs/${this.docId}/rename/`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': this.csrfToken
+          },
+          body: JSON.stringify({ title: newTitle })
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          titleEl.textContent = data.title;
+          document.title = `${data.title} — Monach Sync`;
+          if (window.toast) toast.success('Document renamed');
+        } else {
+          if (window.toast) toast.error(data.error || 'Failed to rename');
+        }
+      } catch (err) {
+        if (window.toast) toast.error('Error renaming document');
+      }
+    };
+
+    if (editBtn) editBtn.addEventListener('click', startEdit);
+    titleEl.addEventListener('click', startEdit);
+    inputEl.addEventListener('blur', saveEdit);
+    inputEl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        inputEl.blur();
+      } else if (e.key === 'Escape') {
+        inputEl.value = titleEl.textContent.trim();
+        inputEl.style.display = 'none';
+        titleEl.style.display = 'inline-block';
+        if (editBtn) editBtn.style.display = 'inline-flex';
+      }
+    });
+  }
+
+  _updateWordCount() {
+    const text = this.textarea.value.trim();
+    const words = text ? text.split(/\s+/).length : 0;
+    const chars = this.textarea.value.length;
+    const wordEl = document.getElementById('statWordCount');
+    const charEl = document.getElementById('statCharCount');
+    if (wordEl) wordEl.textContent = words;
+    if (charEl) charEl.textContent = chars;
   }
 
   _handleSelectionChange() {
@@ -106,8 +206,11 @@ class CollaborativeEditorApp {
 
     if (end > start) {
       this.floatingToolbar.style.display = 'flex';
-      this.floatingToolbar.style.top = '10px';
-      this.floatingToolbar.style.right = '20px';
+      const coords = this.presence._getCaretCoordinates(start);
+      const top = Math.max(10, coords.top - 48);
+      const left = Math.max(120, coords.left);
+      this.floatingToolbar.style.top = `${top}px`;
+      this.floatingToolbar.style.left = `${left}px`;
     } else {
       this.floatingToolbar.style.display = 'none';
     }
@@ -146,6 +249,9 @@ class CollaborativeEditorApp {
     if (this.floatingToolbar) {
       this.floatingToolbar.style.display = 'none';
     }
+    if (window.toast) {
+      toast.info(`AI ${action} requested...`);
+    }
   }
 
   _handleAIStatus(msg) {
@@ -157,18 +263,21 @@ class CollaborativeEditorApp {
       this.aiStatusText.textContent = msg.status === 'queued' ? 'AI queued...' : 'AI writing...';
     } else if (msg.status === 'done') {
       this.aiStatusText.textContent = 'AI edit applied ✓';
+      if (window.toast) toast.success('AI changes applied successfully');
       setTimeout(() => {
         this.aiStatusPill.style.display = 'none';
       }, 2500);
       this.activeAiJobId = null;
     } else if (msg.status === 'cancelled') {
       this.aiStatusText.textContent = 'AI cancelled';
+      if (window.toast) toast.warning('AI request was cancelled');
       setTimeout(() => {
         this.aiStatusPill.style.display = 'none';
       }, 2000);
       this.activeAiJobId = null;
     } else if (msg.status === 'failed') {
       this.aiStatusText.textContent = 'AI error';
+      if (window.toast) toast.error('AI generation encountered an error');
       setTimeout(() => {
         this.aiStatusPill.style.display = 'none';
       }, 2000);
@@ -186,7 +295,7 @@ class CollaborativeEditorApp {
       authors.textContent = `Edits made by: ${msg.authors.join(', ')} (Revisions #${msg.from_seq} → #${msg.to_seq})`;
     }
     bullets.textContent = msg.summary;
-    modal.style.display = 'flex';
+    modal.classList.add('is-open');
   }
 
   _handleSuggestion(msg) {
@@ -202,12 +311,14 @@ class CollaborativeEditorApp {
       acceptBtn.onclick = () => {
         this.sync.sendSuggestionAccept(msg.suggestion_id);
         this.suggestionCard.style.display = 'none';
+        if (window.toast) toast.success('Suggestion accepted');
       };
     }
     if (rejectBtn) {
       rejectBtn.onclick = () => {
         this.sync.sendSuggestionReject(msg.suggestion_id);
         this.suggestionCard.style.display = 'none';
+        if (window.toast) toast.info('Suggestion discarded');
       };
     }
   }
@@ -238,9 +349,11 @@ class CollaborativeEditorApp {
       this.rga = this.RGA.fromDict(msg.snapshot, this.siteId);
     }
     this.textarea.value = this.rga.text();
+    this._updateWordCount();
     if (this.statDocSeq) {
       this.statDocSeq.textContent = msg.head_seq;
     }
+    this.presence._updateAllCursorPositions();
   }
 
   _handleLocalInput() {
@@ -273,7 +386,7 @@ class CollaborativeEditorApp {
     const deleteCount = oldSuffixLen - prefixLen + 1;
     const insertChars = newText.slice(prefixLen, newSuffixLen + 1);
 
-    // 1. Generate local delete operations (delete from prefixLen)
+    // 1. Generate local delete operations
     for (let i = 0; i < deleteCount; i++) {
       if (prefixLen < this.rga.visibleLen()) {
         const delOp = this.rga.localDelete(prefixLen);
@@ -302,7 +415,6 @@ class CollaborativeEditorApp {
     this.isApplyingRemote = true;
 
     // --- CURSOR ANCHORING ---
-    // Record current cursor position and find its preceding CharId anchor
     const cursorPos = this.textarea.selectionStart;
     let anchorCharId = null;
     if (cursorPos > 0 && cursorPos <= this.rga.visibleLen()) {
@@ -322,6 +434,7 @@ class CollaborativeEditorApp {
 
       // Update textarea content
       this.textarea.value = this.rga.text();
+      this._updateWordCount();
 
       // Restore cursor position relative to anchored CharId
       let newCursorPos = 0;
@@ -334,6 +447,7 @@ class CollaborativeEditorApp {
 
       newCursorPos = Math.min(newCursorPos, this.textarea.value.length);
       this.textarea.setSelectionRange(newCursorPos, newCursorPos);
+      this.presence._updateAllCursorPositions();
     }
 
     this.isApplyingRemote = false;

@@ -1,47 +1,65 @@
-# Design Document — Real-Time Collaborative Sync Engine
+# Design Document: Real-Time Collaborative Sync Engine
 
-## 1. Problem Statement
-Modern collaborative applications (Google Docs, Figma, Notion) allow multiple distributed users to simultaneously edit shared state across high-latency, unreliable networks. When multiple clients edit the exact same document location concurrently or while disconnected, simple lock-based or last-write-wins strategies cause data loss, corruption, or user frustration.
+## 1. Problem
+Several people edit one document at the same time over unreliable networks, sometimes offline. Locks block people, and last-write-wins loses keystrokes. The system must let every replica apply edits in any order and still end with identical text, keep a full history, and survive disconnects, process restarts, and more than one server node.
 
-This project implements a **Real-Time Collaborative Sync Engine** from first principles, providing strong eventual consistency, offline editing resilience, and non-destructive version history.
+## 2. Core decisions (details in `docs/adr/`)
 
----
+| Decision | Choice | ADR |
+|---|---|---|
+| Conflict resolution | Operation-based RGA sequence CRDT, written from scratch in Python and JS | 001, 002 |
+| Character identity | `CharId = (lamport, site_id)`; concurrent inserts after the same parent are ordered by `CharId` descending | 002 |
+| Delivery semantics | At-least-once delivery + idempotent ops (`op_id`) = effectively-once application | 002 |
+| History & revert | Append-only op log; revert = new compensating ops, never rewriting history | 003 |
+| AI edits | The AI is a CRDT peer with its own `site_id`; output is validated, then diffed into ops | 004 |
+| Write path | Postgres row lock sequences ops; per-process replicas catch up from the log; per-doc group commit; lossy fan-out repaired by sequence gaps | 005 |
 
-## 2. Core Architectural Decisions
+## 3. Architecture
 
-### 2.1 Conflict Resolution: CRDT (RGA) over Operational Transformation (OT)
-- **Decision:** We use an **Operation-based Replicated Growable Array (RGA)** CRDT.
-- **Rationale:** Operational Transformation (OT) requires a centralized server to serialize and transform concurrent operations against a global history buffer. OT is notoriously difficult to verify for correctness under complex concurrency patterns and performs poorly in peer-to-peer or extended offline editing scenarios.
-- **CRDT Advantage:** State and operation CRDTs are mathematically commutative, associative, and idempotent. Edits can be applied in any arrival order and guarantee convergence across all replicas.
-- **Trade-off:** RGA requires tombstone markers for deleted characters, increasing memory consumption. We address this with periodic snapshotting and tombstone garbage collection.
+```
+ browser (rga.js + sync.js)                     browser
+        │  WebSocket                                │
+        ▼                                           ▼
+ ┌──────────────┐   nginx (least_conn)   ┌──────────────┐
+ │ Daphne node 1│◄──────────────────────►│ Daphne node 2│
+ │  consumer    │                        │  consumer    │
+ │  DocWriter ──┼── group commit ──┐  ┌──┼── DocWriter  │
+ │  RGA replica │                  ▼  ▼  │  RGA replica │
+ └──────┬───────┘             PostgreSQL └──────┬───────┘
+        │                 op log · snapshots     │
+        └──────────── Redis channel layer ───────┘
+                 (fan-out, Celery broker, rate limits)
+```
 
-### 2.2 Character Identity & Total Ordering
-- Every character is uniquely identified by `CharId = (lamport_clock: int, site_id: str)`.
-- `ROOT = CharId(0, "")` serves as the document start sentinel.
-- Concurrent insertions at the same parent position are ordered deterministically by comparing `CharId`: higher `lamport_clock` comes first; ties are broken by lexicographical order of `site_id`.
+Write of one keystroke:
+1. The browser applies the op locally, stores it in `localStorage` until acked, and sends `op`.
+2. The consumer enqueues it on the document's `DocumentWriter` and keeps processing other messages.
+3. The writer commits the queued batch in one transaction: `SELECT … FOR UPDATE` on the document, catch up the replica if another node wrote, assign `server_seq`s, `bulk_create` the ops, snapshot every 500 ops.
+4. One `ops` frame goes to the Redis group and each node forwards it to its sockets (minus the sender, who gets `ack`).
+5. Clients advance their contiguous `last_seq`; a hole that lasts 1 s triggers `sync{reason:"gap"}`.
 
-### 2.3 Idempotency & Delivery Guarantees
-- Every operation generated carries a unique `op_id` (UUID).
-- Replicas maintain an `applied_op_ids` set. Receiving an operation multiple times (e.g. on network retry / reconnect) is guaranteed to be a safe no-op.
+## 4. WebSocket protocol
 
-### 2.4 Transport & Broadcast Architecture
-- **WebSockets via Django Channels:** Low-latency bi-directional transport.
-- **Redis Channel Layer:** Decoupled pub/sub message broker enabling horizontal scaling across multiple Daphne ASGI worker processes.
-
-### 2.5 Persistence & Revert Strategy
-- **Append-Only Operation Log:** Operations are persisted sequentially in PostgreSQL with per-document sequence numbers (`server_seq`).
-- **Revert as New Ops:** History is immutable and never rewritten. Reverting to an earlier timestamp generates *new compensating operations*, preserving auditability and convergence.
-
----
-
-## 3. WebSocket Protocol Specification
-
-| Direction | Message Type | Payload | Purpose |
+| Direction | Type | Payload | Purpose |
 |---|---|---|---|
-| `client → server` | `sync` | `{"type":"sync", "last_seq": 42, "pending": [op,...]}` | Reconnect & catch up |
-| `server → client` | `sync_ack` | `{"type":"sync_ack", "missed": [op,...], "acked": [id,...], "head_seq": 57}` | Catch-up response |
-| `client → server` | `op` | `{"type":"op", "op": {...}}` | Client edit |
-| `server → group` | `op` | `{"type":"op", "op": {...}, "seq": 58}` | Broadcast edit |
-| `server → client` | `ack` | `{"type":"ack", "op_id": "...", "seq": 58}` | Edit acknowledgement |
-| `client ↔ server` | `presence` | `{"type":"presence", "user": "A", "color": "#e66", "cursor_anchor": "12@site3"}` | Remote cursor & presence |
-| `client → server` | `ai_request` | `{"type":"ai_request", "kind": "rewrite", "anchor_start": "...", "anchor_end": "..."}` | Async AI co-author task |
+| server → client | `init` | `{head_seq, text, snapshot, role}` | Initial state on connect |
+| client → server | `op` | `{op}` | One local edit |
+| server → client | `ack` | `{op_id, seq}` | Edit committed with sequence number |
+| server → client | `ops` | `{ops: [{seq, op}, …]}` | Other clients' committed edits (one frame per commit batch) |
+| client → server | `sync` | `{reason: "reconnect"\|"gap"\|"flush", last_seq, pending: [op…]}` | Catch up and upload offline edits |
+| server → client | `sync_ack` | `{missed: [{seq, op}…], acked: [op_id…], head_seq}` | Every op after `last_seq` |
+| client ↔ server | `presence` | `{color, cursor_anchor, cursor_pos}` | Live cursors (username is taken from the session) |
+| client → server | `ai_request` / `ai_cancel` | `{kind, anchor_start, anchor_end, instruction}` / `{job_id}` | AI co-author jobs (editors only, scoped to this document) |
+| server → client | `ai_status`, `new_suggestion`, `suggestion_update`, `missed_summary` | | AI job lifecycle |
+| server → client | `error` | `{code, message}` | `forbidden`, `bad_op`, `op_rejected`, `rate_limited`, … |
+
+## 5. Security model
+- **Authentication:** Django sessions. WebSocket upgrades must carry an `Origin` matching `ALLOWED_HOSTS` (blocks cross-site WebSocket hijacking).
+- **Authorization:** deny by default (`documents/permissions.py`). Only owners and collaborators can open a document, over HTTP or WebSocket. Only owners/editors can write, revert, or run AI jobs. Documents a user can't access return 404, so IDs can't be probed.
+- **AI guardrails:** instruction injection heuristics, delimiter escaping of document text, per-user rate limits and daily token budgets in the shared cache.
+
+## 6. Known limitations
+- Tombstones are never garbage-collected.
+- One Python process saturates at roughly 250–280 committed ops/s on a laptop (`docs/BENCHMARKS.md`).
+- Presence is ephemeral and not persisted.
+- The AI applies its edit when generation finishes; it does not stream text into the document.

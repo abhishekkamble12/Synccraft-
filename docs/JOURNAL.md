@@ -13,7 +13,7 @@
 ## Day 3 — Django Backend & Real-Time Broadcast
 - **Built:** Django ORM models (`Document`, `Collaborator`, `Operation`, `Snapshot`, `AIJob`, `Suggestion`, `DocChunk`). Domain services in `documents/services.py` with `select_for_update` atomic sequence assignment, in-memory caching with document locking, snapshot restoration, and non-destructive revert generation. Async `DocumentConsumer` with Redis channel layer pub/sub broadcast, role validation, and `WebsocketCommunicator` test suite.
 - **Broke / Debugged:** Used `select_for_update()` inside `transaction.atomic()` to guarantee monotonic `server_seq` increment under heavy concurrent WebSocket write traffic.
-- **Learned:** How separating in-memory CRDT mutation from append-only database persistence provides sub-millisecond broadcast while retaining full crash-recovery safety.
+- **Learned:** How an in-memory replica in front of an append-only op log gives cheap reads while keeping crash recovery. *(Day 10 found that this version deadlocked on its first write and that the cache went stale with more than one process.)*
 
 ## Day 4 — Browser Editor & Live Sync
 - **Built:** Full frontend collaborative workspace: document listing, creation, and live editor templates (`editor.html`, `list.html`). Integrated `editor.js`, `sync.js`, and `presence.js`. Fast string diff algorithm converting typing to minimal RGA operations. **CharId-based cursor anchoring** preventing cursor jumps when remote edits arrive. Live RTT latency tracking and presence avatars.
@@ -31,12 +31,12 @@
 - **Learned:** Why append-only compensating operations make document history strictly immutable, auditable, and inherently conflict-free across active collaborators.
 
 ## Day 7 — Scale, Observability & Delivery
-- **Built:** High-concurrency load testing swarm (`loadtest/swarm.py`) measuring p50/p95/p99 latency with 50, 100, and 200 concurrent clients. Prometheus metrics export on `/metrics` with operations counters, latency histograms, and active connection gauges. Multi-replica Docker Compose setup with Nginx load balancer and 2 Daphne ASGI workers. Comprehensive documentation in `docs/BENCHMARKS.md` and complete portfolio `README.md`.
+- **Built:** Load-testing swarm (`loadtest/swarm.py`), Prometheus metric definitions, a two-node Docker Compose setup behind nginx. *(Day 10: the benchmark numbers first published here were never actually measured, since the write path deadlocked. The metrics were never incremented. Both were replaced with real ones.)*
 - **Broke / Debugged:** Configured Nginx WebSocket reverse proxying with `Upgrade` and `Connection` headers and sticky connection timeout settings to prevent premature connection dropouts.
-- **Learned:** How the Redis channel layer seamlessly routes messages across independent Daphne worker processes to achieve linear horizontal scalability.
+- **Learned:** The Redis channel layer routes messages across Daphne processes, but it doesn't guarantee delivery, and per-process state has to be kept coherent separately (see Day 10).
 
 ## Day 8 — AI Co-Author as a First-Class CRDT Peer
-- **Built:** Autonomous `AIPeer` (`ai/agent_peer.py`) integrating LLM generation as a native CRDT collaborator with its own `site_id` and Lamport clock. Diff-to-Op decomposition transforming streaming LLM tokens into incremental CRDT insert and delete operations broadcast over the Redis channel layer. Celery worker tasks (`ai/tasks.py`) with `rewrite_task`. Concurrency test suite (`tests/test_ai_peer.py`) verifying concurrent human and AI edits converge with zero dropped characters.
+- **Built:** Autonomous `AIPeer` (`ai/agent_peer.py`) integrating LLM generation as a native CRDT collaborator with its own `site_id` and Lamport clock. Diff-to-op decomposition turning the model's rewrite into CRDT insert/delete ops. *(Day 10: this version called the sync ORM inside an event loop and failed on every job; it also buffered output rather than streaming it.)* Celery worker tasks (`ai/tasks.py`) with `rewrite_task`. Concurrency test suite (`tests/test_ai_peer.py`) verifying concurrent human and AI edits converge with zero dropped characters.
 - **Broke / Debugged:** Handled anchor deletion gracefully (`AnchorDeletedError`) if a human user deletes the targeted selection range while the AI is streaming tokens. Implemented mid-stream cancellation with zero orphaned database locks.
 - **Learned:** Why treating AI as an equal peer within the CRDT math model completely eliminates the need for document-level locking during AI generation.
 
@@ -45,3 +45,9 @@
 - **Broke / Debugged:** Discovered that closing tags (`</document_text>`) inside user-generated documents could cause prompt injection escapes; implemented strict XML escaping for delimiter integrity.
 - **Learned:** How combining prompt injection guardrails with deterministic CRDT operations creates a safe, auditable AI assistant in collaborative systems.
 
+## Day 10: Audit, Then Hardening Against Real Load
+- **Found:** An audit that actually *ran* the system found the write path deadlocked on its first op: `apply_operation` re-acquired its own non-reentrant per-document lock. There were no migrations, so `docker compose up` produced an app with no tables. Every user, including anonymous ones, got `editor` on every document. The AI peer raised `SynchronousOnlyOperation` on every job. The eval runner scored failures as passes, and the README's benchmark numbers had never been measured.
+- **Fixed:** Deny-by-default permissions across HTTP and WebSocket, an `Origin` check on WebSocket upgrades, migrations plus a compose `migrate` step, and an AI peer that runs synchronously in Celery. Server replicas now track the last applied `server_seq` and catch up from the op log under the row lock, which makes two web nodes safe. Added regression tests for each bug (76 Python + 6 JS tests).
+- **Broke (with a real load test):** At 10 concurrent clients, 676 of 1,800 broadcasts never arrived and clients diverged permanently. Django Channels' layers silently drop group messages when a socket's queue is full, and the client tracked `max(seq)`, so it never noticed holes. Propagation p50 was about 1.5 s, because every socket blocked on its own one-op transaction.
+- **Fixed:** (1) Clients track the highest *contiguous* seq and send `sync{reason:"gap"}` when a hole persists. (2) Per-document group commit: consumers enqueue and keep reading while one writer commits whatever has queued as a single transaction. (3) One broadcast frame per committed batch instead of per op. At 10 clients, p50 dropped to 40 ms with zero divergence. The benchmark also caught gap-repair syncs spawning AI summary jobs, so `sync` now carries an explicit `reason`.
+- **Learned:** Treat pub/sub as lossy and make sequence numbers do the correctness work. Batch at the point of contention (the transaction and the fan-out), not at the edges. And a benchmark you haven't run is a claim, not a result.

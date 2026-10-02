@@ -4,15 +4,15 @@ and crash recovery (Core Requirements 03 & 07).
 """
 
 import pytest
-from channels.testing import WebsocketCommunicator
+from channels.db import database_sync_to_async
 from django.contrib.auth.models import User
 
 import documents.services as services
-from config.asgi import application
 from crdt.ids import ROOT, CharId
 from crdt.ops import Op
 from crdt.rga import RGA
 from documents.models import Document, Operation
+from tests.helpers import ws_communicator
 
 
 @pytest.mark.asyncio
@@ -24,7 +24,7 @@ async def test_disconnect_mid_edit_no_duplicate_or_loss() -> None:
     user = await User.objects.acreate(username="tester_dup")
     doc = await Document.objects.acreate(title="Disconnect Test", owner=user)
 
-    comm1 = WebsocketCommunicator(application, f"/ws/docs/{doc.id}/")
+    comm1 = ws_communicator(doc.id, user)
     await comm1.connect()
     await comm1.receive_json_from()  # Consume init
 
@@ -45,7 +45,7 @@ async def test_disconnect_mid_edit_no_duplicate_or_loss() -> None:
     await comm1.disconnect()
 
     # Reconnect fresh communicator (client resumes session)
-    comm2 = WebsocketCommunicator(application, f"/ws/docs/{doc.id}/")
+    comm2 = ws_communicator(doc.id, user)
     await comm2.connect()
     init_msg = await comm2.receive_json_from()
     assert init_msg["type"] == "init"
@@ -68,7 +68,7 @@ async def test_disconnect_mid_edit_no_duplicate_or_loss() -> None:
     assert count == 2
 
     # Assert final document text is exactly "Hi"
-    rga = services.get_or_load_document_rga(doc.id)
+    rga = await database_sync_to_async(services.get_or_load_document_rga)(doc.id)
     assert rga.text() == "Hi"
 
     await comm2.disconnect()
@@ -85,7 +85,7 @@ async def test_offline_concurrent_editing_merges_on_reconnect() -> None:
     doc = await Document.objects.acreate(title="Offline Merge Test", owner=user)
 
     # Initial state: type "BASE" on server
-    comm_online = WebsocketCommunicator(application, f"/ws/docs/{doc.id}/")
+    comm_online = ws_communicator(doc.id, user)
     await comm_online.connect()
     await comm_online.receive_json_from()
 
@@ -99,9 +99,9 @@ async def test_offline_concurrent_editing_merges_on_reconnect() -> None:
         parent = cid
 
     # Client B starts offline with copy of "BASE" (last_seq = 4)
-    client_b_rga = RGA(site_id="client_b")
-    for idx, c in enumerate(chars, start=1):
-        client_b_rga.local_insert(idx - 1, c)
+    state_at_4 = await database_sync_to_async(services.get_document_state)(doc.id)
+    assert state_at_4.seq == 4
+    client_b_rga = RGA.from_dict(state_at_4.state, site_id="client_b")
 
     # --- Concurrent Edits While Client B is Offline ---
     # 1. Client A (online) inserts "!" at the end (pos 4 -> "BASE!")
@@ -117,7 +117,7 @@ async def test_offline_concurrent_editing_merges_on_reconnect() -> None:
     op_b2 = client_b_rga.local_insert(1, "U")
 
     # --- Client B Reconnects and Synchronizes ---
-    comm_b = WebsocketCommunicator(application, f"/ws/docs/{doc.id}/")
+    comm_b = ws_communicator(doc.id, user)
     await comm_b.connect()
     await comm_b.receive_json_from()  # init
 
@@ -137,10 +137,11 @@ async def test_offline_concurrent_editing_merges_on_reconnect() -> None:
 
     # Client A receives the broadcasted offline ops from Client B
     b_broadcast_1 = await comm_online.receive_json_from()
-    assert b_broadcast_1["type"] == "op"
+    assert b_broadcast_1["type"] == "ops"
+    assert {i["op"]["op_id"] for i in b_broadcast_1["ops"]} == {op_b1.op_id, op_b2.op_id}
 
     # Server state convergence
-    server_rga = services.get_or_load_document_rga(doc.id)
+    server_rga = await database_sync_to_async(services.get_or_load_document_rga)(doc.id)
     server_text = server_rga.text()
 
     # Apply missed ops to Client B
@@ -167,7 +168,7 @@ async def test_server_crash_recovery_from_database() -> None:
     user = await User.objects.acreate(username="crash_tester")
     doc = await Document.objects.acreate(title="Crash Recovery Doc", owner=user)
 
-    comm = WebsocketCommunicator(application, f"/ws/docs/{doc.id}/")
+    comm = ws_communicator(doc.id, user)
     await comm.connect()
     await comm.receive_json_from()
 
@@ -184,10 +185,9 @@ async def test_server_crash_recovery_from_database() -> None:
     await comm.disconnect()
 
     # --- SIMULATE CRASH: Clear all in-memory caches ---
-    services._doc_cache.clear()
-    services._doc_locks.clear()
+    services.clear_replica_cache()
 
     # Reconnect and load document from scratch
-    reconstructed_rga = services.get_or_load_document_rga(doc.id)
+    reconstructed_rga = await database_sync_to_async(services.get_or_load_document_rga)(doc.id)
     assert reconstructed_rga.text() == expected_str
     assert reconstructed_rga.visible_len() == len(expected_str)

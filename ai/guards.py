@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 # Injection patterns to detect and neutralize
 INJECTION_SIGNALS = [
-    re.compile(r"ignore\s+(all\s+)?(previous|above|prior)\s+instructions?", re.IGNORECASE),
+    re.compile(r"\b(ignore|forget)\s+(all\s+)?(the\s+)?(previous|above|prior)\b", re.IGNORECASE),
     re.compile(r"disregard\s+(the\s+)?system\s+prompt", re.IGNORECASE),
     re.compile(r"you\s+are\s+now\s+(an?\s+)?unrestricted", re.IGNORECASE),
     re.compile(r"<\s*/?\s*system\s*>", re.IGNORECASE),

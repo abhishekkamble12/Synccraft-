@@ -1,32 +1,35 @@
 # ADR 004: AI Co-Author as a First-Class CRDT Peer
 
 ## Status
-Accepted
+Accepted (revised after the hardening pass. See "Revision" below.)
 
 ## Context
-Integrating Generative AI assistants into live collaborative document editors presents a concurrency challenge:
-- Traditional implementations lock the entire document, preventing human collaborators from typing while the AI is generating.
-- Alternatively, models output text in bulk, causing full text replacement and clobbering concurrent human edits typed during the AI round trip.
+An AI assistant that rewrites part of a shared document runs into a concurrency problem:
+- Locking the document while the model generates blocks every human collaborator.
+- Replacing the selected text wholesale when the model returns throws away any keystrokes humans typed during the round trip.
 
-We need an architecture where the AI co-author can stream responses into the document in real time while humans continue typing simultaneously, with zero lost keystrokes and guaranteed mathematical convergence.
+We want the AI's edit to merge with concurrent human edits under the same convergence guarantee that human edits get.
 
 ## Decision
-We treat the **AI Agent as a first-class CRDT peer (`AIPeer`)**:
-1. **Dedicated Replica Identity:** The AI worker assigns itself a unique `site_id = "ai-{job_id}"` and advances its own Lamport logical clock.
-2. **Anchor-Bound Targeting:** The user selection is anchored not by volatile integer indices, but by immutable `CharId`s (`anchor_start`, `anchor_end`).
-3. **Diff-to-Op Decomposition:** As the LLM streams tokens, the `AIPeer` diffs the new text against the target anchor slice and translates modifications into standard atomic CRDT operations (`local_insert` and `local_delete`).
-4. **Equal Protocol Citizen:** The generated operations pass through the identical database pipeline (`apply_operation`) and Redis Channels pub/sub group broadcast (`doc.op`) as human edits.
-5. **Conflict Handling:** If human collaborators delete the anchor characters during generation, the AI peer detects the tombstone status and aborts gracefully (`AnchorDeletedError`).
-6. **Cancellation Mid-Stream:** If a user clicks Cancel, the job state is updated and the streaming loop terminates immediately, leaving partially applied operations intact and revertible through version history.
+The AI is a CRDT peer (`AIPeer`, `ai/agent_peer.py`):
+
+1. **Own replica identity.** Each job gets a unique `site_id` (`ai-<random>`) and Lamport clock, so its `CharId`s never collide with human ones.
+2. **Anchors, not indices.** The selection is identified by immutable `CharId`s (`anchor_start`, `anchor_end`). Positions are resolved against the latest server state when the edit is applied, not when it was requested.
+3. **Buffer, validate, then apply.** LLM output is collected in full and passed through the output guardrails *before* any op is emitted. A rejected or cancelled response therefore never leaves half-written text in the document. Cancellation is polled from the DB (at most every 0.5 s) while the stream is read.
+4. **Diff-to-ops.** The accepted text is diffed against the anchored range (`difflib.SequenceMatcher`), and only the changed characters become insert/delete ops, generated right-to-left so earlier indices stay valid.
+5. **Same pipeline as humans.** The ops are committed in one batch via `apply_operations` (one transaction, one row lock) and broadcast as a single `ops` frame.
+6. **Anchor deleted → abort.** If a collaborator deleted an anchor character before the edit lands, the job fails with `AnchorDeletedError` instead of guessing.
 
 ## Consequences
 
 ### Positive
-- **Zero Document Locking:** Humans can edit the same paragraph concurrently while the AI writes; CRDT total ordering cleanly merges both streams.
-- **Auditable History:** AI operations are tagged with their distinct `site_id`, enabling full attribution in version history and op logs.
-- **Graceful Degradation:** If the LLM provider fails, times out, or rate limits, the document CRDT engine and human collaboration remain 100% operational.
-- **Revertible:** Because AI edits are standard CRDT operations, they can be reverted to any prior sequence number using compensating operations (ADR 003).
+- **No document locking.** Human ops that are concurrent with the AI's ops merge by RGA ordering. `tests/test_ai_peer.py::test_ai_and_human_concurrent_edits_converge` delivers the full log to replicas in different orders and checks they converge with every human character kept.
+- **Attribution and undo.** AI ops carry their own `site_id` in the op log and can be reverted like any other edit (ADR 003).
+- **Graceful degradation.** LLM failures mark the job `failed`; editing is unaffected.
 
-### Negative / Trade-offs
-- **High Op Volume:** Streaming text character-by-character generates numerous operations.
-- **Mitigation:** Batch ops in chunks of 5-15 characters and rely on periodic snapshotting every 500 operations.
+### Negative / trade-offs
+- **No token-by-token streaming into the document.** Users see an "AI is writing…" presence indicator, not text appearing live. This was a deliberate choice for guardrail safety; streaming would need a "draft" layer that can be discarded atomically.
+- **Diff granularity is characters.** A long rewrite becomes many ops (bounded by output size); they share one transaction and one broadcast frame.
+
+## Revision
+The first version claimed that the AI "streams tokens as ops" and called the async ORM from inside an event loop (`SynchronousOnlyOperation` on every job). The peer is now synchronous, which fits a Celery worker. Only the LLM stream runs async, through `async_to_sync`, and the "streaming" claim was replaced by the buffer-validate-apply design above.
