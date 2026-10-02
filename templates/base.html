@@ -14,8 +14,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
 
   {% load static %}
-  <link rel="stylesheet" href="{% static 'css/editor.css' %}">
-  <link rel="stylesheet" href="{% static 'css/animations.css' %}">
+  <link rel="stylesheet" href="{% static 'css/editor.css' %}?v={{ static_version }}">
+  <link rel="stylesheet" href="{% static 'css/animations.css' %}?v={{ static_version }}">
   {% block extra_head %}{% endblock %}
 </head>
 <body>
@@ -45,7 +45,7 @@
   <!-- Toast notification container -->
   <div id="toastContainer" class="toast-container"></div>
 
-  <script src="{% static 'js/toast.js' %}"></script>
+  <script src="{% static 'js/toast.js' %}?v={{ static_version }}"></script>
   {% block extra_scripts %}{% endblock %}
 </body>
 </html>

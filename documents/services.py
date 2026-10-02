@@ -400,9 +400,7 @@ def sync_client_state(
 # -----------------------------------------------------------------------------
 
 
-def record_site_ack(
-    doc_id: uuid.UUID, site_id: str, user: User | None, acked_seq: int
-) -> bool:
+def record_site_ack(doc_id: uuid.UUID, site_id: str, user: User | None, acked_seq: int) -> bool:
     """
     Record that `site_id` will never again submit an op based on a state older
     than `acked_seq`. Returns False if the site belongs to another user.
@@ -480,9 +478,7 @@ def flush_site_acks(doc_id: uuid.UUID) -> None:
 
 def touch_site(doc_id: uuid.UUID, site_id: str) -> None:
     """Refresh a session's last_seen (on disconnect, so the TTL counts from then)."""
-    SiteSession.objects.filter(document_id=doc_id, site_id=site_id).update(
-        last_seen=timezone.now()
-    )
+    SiteSession.objects.filter(document_id=doc_id, site_id=site_id).update(last_seen=timezone.now())
 
 
 def stable_seq(doc: Document) -> int:
@@ -533,9 +529,7 @@ def compact_document(doc_id: uuid.UUID, min_ops: int | None = None) -> Compactio
                 # their author saw a deletion, so the tombstones they name must stay.
                 later = [
                     Op.from_dict(payload)
-                    for payload in Operation.objects.filter(
-                        document=doc, server_seq__gt=stable
-                    )
+                    for payload in Operation.objects.filter(document=doc, server_seq__gt=stable)
                     .order_by("server_seq")
                     .values_list("payload", flat=True)
                 ]

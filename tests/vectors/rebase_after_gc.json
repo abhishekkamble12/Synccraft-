@@ -3,7 +3,7 @@
  "kind": "rebase",
  "shared": [
   {
-   "op_id": "6772bf7469204dd2a6eb206e78b8b713",
+   "op_id": "dce3d1cae7fb4818a0a19150e29296b9",
    "site_id": "alice",
    "lamport": 25,
    "type": "insert",
@@ -14,7 +14,7 @@
  ],
  "pending": [
   {
-   "op_id": "a5c2bbf12f9d417d80d66fb8ab8100e3",
+   "op_id": "de26e933d56f4ea985d0796b1c2b52ea",
    "site_id": "bob",
    "lamport": 27,
    "type": "delete",
@@ -26,7 +26,7 @@
    ]
   },
   {
-   "op_id": "d1ed223907dc410d9655952c1edb8a11",
+   "op_id": "61f343500652446286fe6a5b52f5f26d",
    "site_id": "bob",
    "lamport": 28,
    "type": "insert",
@@ -35,7 +35,7 @@
    "text": "😀"
   },
   {
-   "op_id": "f43b24d51bc34444b627bae335caa439",
+   "op_id": "aab054d036b94d588124d339fec5749f",
    "site_id": "bob",
    "lamport": 29,
    "type": "delete",
@@ -47,7 +47,7 @@
    ]
   },
   {
-   "op_id": "b94c50c12f104f0d86af8de015e89ae6",
+   "op_id": "a335ea764f7741508600764bf1daccca",
    "site_id": "bob",
    "lamport": 30,
    "type": "insert",
@@ -56,7 +56,7 @@
    "text": "😀"
   },
   {
-   "op_id": "53157e21baf14bda835dd406894c73f6",
+   "op_id": "f7d73e76c1e843b3a059dce616c21749",
    "site_id": "bob",
    "lamport": 31,
    "type": "insert",
@@ -65,7 +65,7 @@
    "text": "!"
   },
   {
-   "op_id": "30f15c9c753c4ea193441a787cfc178d",
+   "op_id": "9ee9f83a300f4fce982e5b3728d0c18a",
    "site_id": "bob",
    "lamport": 32,
    "type": "insert",

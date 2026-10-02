@@ -104,6 +104,21 @@ def test_ai_rewrite_of_anchored_range_leaves_rest_of_document() -> None:
 
 
 @pytest.mark.django_db(transaction=True)
+def test_ai_continue_appends_after_range_instead_of_replacing() -> None:
+    user = User.objects.create(username="continue_owner")
+    doc = Document.objects.create(title="Continue Doc", owner=user)
+    _type_text(doc, user, "First paragraph.", "h")
+
+    job = AIJob.objects.create(document=doc, user=user, kind="continue")
+    result = AIPeer(
+        doc_id=doc.id, job_id=job.id, user=user, llm_client=FakeLLMClient("Second paragraph.")
+    ).run(kind="continue")
+
+    assert result["status"] == "done", result
+    assert services.get_document_state(doc.id).text == "First paragraph.\n\nSecond paragraph."
+
+
+@pytest.mark.django_db(transaction=True)
 def test_ai_and_human_concurrent_edits_converge() -> None:
     """
     Two humans edit from the pre-AI state while the AI rewrites the same text.
@@ -242,3 +257,32 @@ def test_suggestion_mode_creation_and_acceptance() -> None:
         None, None, suggestion.proposed_text
     )
     assert services.get_document_state(doc.id).text == suggestion.proposed_text
+
+
+def test_groq_client_auto_configuration(monkeypatch: pytest.MonkeyPatch) -> None:
+    from ai.client import OpenAICompatibleLLMClient, get_configured_llm_client
+
+    # Case 1: GROQ_API_KEY is provided
+    monkeypatch.setenv("GROQ_API_KEY", "gsk_test12345")
+    monkeypatch.delenv("LLM_API_KEY", raising=False)
+    monkeypatch.delenv("LLM_BASE_URL", raising=False)
+    monkeypatch.delenv("LLM_MODEL", raising=False)
+
+    client = get_configured_llm_client()
+    assert isinstance(client, OpenAICompatibleLLMClient)
+    assert client.api_key == "gsk_test12345"
+    assert client.base_url == "https://api.groq.com/openai/v1"
+    assert client.model == "openai/gpt-oss-120b"
+
+    # Case 2: LLM_API_KEY with gsk_ prefix
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
+    monkeypatch.setenv("LLM_API_KEY", "gsk_anotherkey")
+
+    client2 = OpenAICompatibleLLMClient()
+    assert client2.base_url == "https://api.groq.com/openai/v1"
+    assert client2.model == "openai/gpt-oss-120b"
+
+    # Case 3: Custom override respected
+    monkeypatch.setenv("LLM_MODEL", "llama-3.1-8b-instant")
+    client3 = OpenAICompatibleLLMClient()
+    assert client3.model == "llama-3.1-8b-instant"

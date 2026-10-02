@@ -3,6 +3,7 @@ import uuid
 from collections.abc import Mapping
 from typing import Any, cast
 
+from django import forms
 from django.contrib.auth import login
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -19,10 +20,28 @@ from documents.permissions import can_edit, get_role
 from documents.services import get_document_state
 
 
+class RegistrationForm(UserCreationForm):
+    """Sign-up form that also records an email, so people can be invited by it."""
+
+    email = forms.EmailField(
+        required=True, help_text="Collaborators can invite you by this address."
+    )
+
+    class Meta(UserCreationForm.Meta):
+        model = User
+        fields = ("username", "email")
+
+    def clean_email(self) -> str:
+        email = str(self.cleaned_data["email"]).strip().lower()
+        if User.objects.filter(email__iexact=email).exists():
+            raise forms.ValidationError("An account with this email already exists.")
+        return email
+
+
 class RegisterView(CreateView):
     """User registration view."""
 
-    form_class = UserCreationForm
+    form_class = RegistrationForm
     template_name = "registration/register.html"
     success_url = reverse_lazy("document_list")
 
@@ -88,6 +107,18 @@ class DocumentDeleteView(LoginRequiredMixin, View):
         return redirect("document_list")
 
 
+def _find_user(identifier: str) -> User | None:
+    """Resolve an invite target by exact username, then case-insensitive username or email."""
+    user = User.objects.filter(username=identifier).first()
+    if user is None:
+        user = User.objects.filter(username__iexact=identifier).first()
+    if user is None and "@" in identifier:
+        matches = list(User.objects.filter(email__iexact=identifier)[:2])
+        # An ambiguous email must not silently pick one of several accounts.
+        user = matches[0] if len(matches) == 1 else None
+    return user
+
+
 class ShareDocumentView(LoginRequiredMixin, View):
     """Manage collaborators for a document."""
 
@@ -134,17 +165,23 @@ class ShareDocumentView(LoginRequiredMixin, View):
                 doc.collaborators.filter(user__username=username).delete()
             return JsonResponse({"success": True})
 
-        username = data.get("username", "").strip()
+        identifier = data.get("username", "").strip()
         role = data.get("role", "editor").strip().lower()
         if role not in ["editor", "viewer"]:
             role = "editor"
 
-        if not username:
-            return JsonResponse({"error": "Username is required"}, status=400)
+        if not identifier:
+            return JsonResponse({"error": "Username or email is required"}, status=400)
 
-        target_user = User.objects.filter(username=username).first()
+        target_user = _find_user(identifier)
         if not target_user:
-            return JsonResponse({"error": f"User '{username}' not found"}, status=404)
+            return JsonResponse(
+                {
+                    "error": f"No account found for '{identifier}'. They must register first; "
+                    "accounts created without an email can only be invited by username."
+                },
+                status=404,
+            )
 
         if target_user == doc.owner:
             return JsonResponse({"error": "User is already the document owner"}, status=400)

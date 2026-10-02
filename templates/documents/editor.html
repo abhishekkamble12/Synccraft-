@@ -44,6 +44,23 @@
         <button type="button" id="cancelAiBtn" class="btn btn-danger btn-xs">Cancel</button>
       </div>
 
+      {% if user_role != 'viewer' %}
+      <!-- AI Assist Menu: works on the selection, or the whole document when nothing is selected -->
+      <div class="ai-menu" id="aiMenu">
+        <button type="button" id="aiMenuBtn" class="btn btn-sm ai-menu-btn" aria-haspopup="true" aria-expanded="false">
+          ✨ AI Assist
+        </button>
+        <div class="ai-menu-dropdown" id="aiMenuDropdown" role="menu">
+          <div class="ai-menu-hint" id="aiMenuHint">Applies to the whole document</div>
+          <button type="button" role="menuitem" data-action="rewrite">✨ Rewrite</button>
+          <button type="button" role="menuitem" data-action="grammar">✍️ Fix grammar</button>
+          <button type="button" role="menuitem" data-action="shorten">✂️ Shorten</button>
+          <button type="button" role="menuitem" data-action="continue">⏩ Continue writing</button>
+          <button type="button" role="menuitem" data-action="suggest">💡 Suggest an edit</button>
+        </div>
+      </div>
+      {% endif %}
+
       <!-- Share Collaborators Button -->
       <button type="button" id="editorShareBtn" class="btn btn-secondary btn-sm" onclick="openEditorShareModal()">
         👥 Share
@@ -201,7 +218,7 @@
             type="text"
             id="editorShareUsernameInput"
             class="form-input"
-            placeholder="Username to invite..."
+            placeholder="Username or email to invite..."
             style="flex: 1;"
           >
           <select id="editorShareRoleSelect" class="form-input" style="width: 120px;">
@@ -235,10 +252,10 @@
 
 {% block extra_scripts %}
 {% load static %}
-<script src="{% static 'js/rga.js' %}"></script>
-<script src="{% static 'js/sync.js' %}"></script>
-<script src="{% static 'js/presence.js' %}"></script>
-<script src="{% static 'js/editor.js' %}"></script>
+<script src="{% static 'js/rga.js' %}?v={{ static_version }}"></script>
+<script src="{% static 'js/sync.js' %}?v={{ static_version }}"></script>
+<script src="{% static 'js/presence.js' %}?v={{ static_version }}"></script>
+<script src="{% static 'js/editor.js' %}?v={{ static_version }}"></script>
 
 <script>
   document.addEventListener('DOMContentLoaded', () => {
@@ -380,7 +397,7 @@
     const role = select ? select.value : 'editor';
 
     if (!username) {
-      if (window.toast) toast.warning('Please enter a username');
+      if (window.toast) toast.warning('Please enter a username or email');
       return;
     }
 
@@ -395,7 +412,7 @@
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        if (window.toast) toast.success(`Invited ${username} as ${role}`);
+        if (window.toast) toast.success(`Invited ${data.collaborator.username} as ${role}`);
         input.value = '';
         await loadEditorCollaborators();
       } else {

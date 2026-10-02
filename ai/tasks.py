@@ -148,6 +148,7 @@ def suggestion_task(job_id_str: str) -> dict[str, Any]:
 
     job.status = "done"
     job.save(update_fields=["status", "updated_at"])
+    peer.broadcast_status("done", "Suggestion ready for review.")
 
     _send_to_room(
         job.document_id,

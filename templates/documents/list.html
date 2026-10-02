@@ -125,7 +125,7 @@
           type="text"
           id="shareUsernameInput"
           class="form-input"
-          placeholder="Enter username to invite..."
+          placeholder="Username or email to invite..."
           style="flex: 1;"
         >
         <select id="shareRoleSelect" class="form-input" style="width: 120px;">
@@ -264,7 +264,7 @@
     const role = roleSelect.value;
 
     if (!username) {
-      if (window.toast) toast.warning('Please enter a username');
+      if (window.toast) toast.warning('Please enter a username or email');
       return;
     }
 
@@ -279,7 +279,7 @@
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        if (window.toast) toast.success(`Invited ${username} as ${role}`);
+        if (window.toast) toast.success(`Invited ${data.collaborator.username} as ${role}`);
         usernameInput.value = '';
         await loadCollaborators(currentShareDocId);
       } else {

@@ -4,7 +4,7 @@
  "num_sites": 2,
  "operations": [
   {
-   "op_id": "4ccf5bf0bd0e4abb9e16fe94ab5fe72a",
+   "op_id": "6c8ca5cb7c14476ab341d5f06904192d",
    "site_id": "site_0",
    "lamport": 5,
    "type": "insert",
@@ -13,7 +13,7 @@
    "text": "W3D6N"
   },
   {
-   "op_id": "87809123213447f0acc0d06b05dd2195",
+   "op_id": "f10bdac7215d40c5b4a0736d83fd591b",
    "site_id": "site_1",
    "lamport": 7,
    "type": "insert",
@@ -22,7 +22,7 @@
    "text": "Q"
   },
   {
-   "op_id": "25080ea7a3d2426d8cec8e9e72f48da3",
+   "op_id": "1e6e25615f7a40ebba54405f53ffa492",
    "site_id": "site_1",
    "lamport": 10,
    "type": "insert",
@@ -31,7 +31,7 @@
    "text": "M4U"
   },
   {
-   "op_id": "963201cc96444cb0b9999bc93229606c",
+   "op_id": "13d5f3d386854320a94bdfa2a814e73b",
    "site_id": "site_0",
    "lamport": 14,
    "type": "insert",
@@ -40,7 +40,7 @@
    "text": "NH🚀"
   },
   {
-   "op_id": "3862e2fdfd4247b69b98a92daeefc8fc",
+   "op_id": "2de93bcb50f4424fbbf5b0e59a40ce8d",
    "site_id": "site_0",
    "lamport": 19,
    "type": "insert",
@@ -49,7 +49,7 @@
    "text": "0A3N"
   },
   {
-   "op_id": "5c2ae9dc9a0945e2a2f40b5af6434291",
+   "op_id": "cb1e302657b149e0a80148e4fde736b0",
    "site_id": "site_0",
    "lamport": 22,
    "type": "insert",
@@ -58,7 +58,7 @@
    "text": "AQ_"
   },
   {
-   "op_id": "5ef42bfa8756474aabef4d299d85bd24",
+   "op_id": "c950b81c53e64b3eafcee9d7214d5aba",
    "site_id": "site_0",
    "lamport": 23,
    "type": "delete",
@@ -74,7 +74,7 @@
    ]
   },
   {
-   "op_id": "95d386393d0544428c5e8bfe9a32e5a1",
+   "op_id": "3e22854c5409464d9f38fd69eadaf57d",
    "site_id": "site_1",
    "lamport": 29,
    "type": "insert",
@@ -83,7 +83,7 @@
    "text": "TL7AF"
   },
   {
-   "op_id": "581cfa3feca5464bad4db5b53adb6049",
+   "op_id": "d497d0364e814d789b5fb49f5bbee57a",
    "site_id": "site_1",
    "lamport": 31,
    "type": "insert",
@@ -92,7 +92,7 @@
    "text": "🚀"
   },
   {
-   "op_id": "2a48f798ca3844e4bed6b79b581aa72c",
+   "op_id": "b751c506315248f0a6b81d46d71aef4f",
    "site_id": "site_0",
    "lamport": 37,
    "type": "insert",
@@ -101,7 +101,7 @@
    "text": "2IFJT"
   },
   {
-   "op_id": "9cbdf909f9e04eb8be839b58d61a0127",
+   "op_id": "05fd63cc83434732a85745514b46c6d8",
    "site_id": "site_1",
    "lamport": 40,
    "type": "insert",
@@ -110,7 +110,7 @@
    "text": "RU"
   },
   {
-   "op_id": "36afa836182a4fbc852f96898dbc3f7c",
+   "op_id": "a532d412c95a47659dae80a77900361e",
    "site_id": "site_1",
    "lamport": 42,
    "type": "delete",
@@ -126,7 +126,7 @@
    ]
   },
   {
-   "op_id": "5ed010fd76a0492baacfc8812379bd30",
+   "op_id": "bbe450be3f544a38a62e6b4834f2fe22",
    "site_id": "site_1",
    "lamport": 44,
    "type": "insert",
@@ -135,7 +135,7 @@
    "text": "AA"
   },
   {
-   "op_id": "771ffd0e0e0d418eb2383547259d3984",
+   "op_id": "33bf9ba18a65410fbf8438cc25b59faf",
    "site_id": "site_1",
    "lamport": 46,
    "type": "delete",
@@ -151,7 +151,7 @@
    ]
   },
   {
-   "op_id": "7f03e8ed066f48a6b5d3b1e28259e0d2",
+   "op_id": "f8a223a591824fb9897db17cff5cafce",
    "site_id": "site_1",
    "lamport": 48,
    "type": "delete",
@@ -167,7 +167,7 @@
    ]
   },
   {
-   "op_id": "d976219598554af19c457cdefa61810f",
+   "op_id": "00009b6d37ff440295710e1c19300379",
    "site_id": "site_1",
    "lamport": 51,
    "type": "insert",
@@ -176,7 +176,7 @@
    "text": "7E"
   },
   {
-   "op_id": "458e188ecca14d2dafb80e3202761ad0",
+   "op_id": "31d21b874e4d483fbedfbc2cac024b42",
    "site_id": "site_0",
    "lamport": 55,
    "type": "insert",
@@ -185,7 +185,7 @@
    "text": "B2M"
   },
   {
-   "op_id": "256bcc833da844acbaee1b8dde3a9f94",
+   "op_id": "6952388aa0264403b8e2cd28d4cc3518",
    "site_id": "site_1",
    "lamport": 59,
    "type": "insert",
@@ -194,7 +194,7 @@
    "text": "TTQ"
   },
   {
-   "op_id": "aced64e7e64f4117a9f472f936a21a0d",
+   "op_id": "bc9bee44093045a2894f615c418781f9",
    "site_id": "site_1",
    "lamport": 62,
    "type": "insert",
@@ -203,7 +203,7 @@
    "text": "Dé"
   },
   {
-   "op_id": "df622159ce2b48ce977757ba8ec12575",
+   "op_id": "be7a870c01f3499fbaf4cff8ecc7edd5",
    "site_id": "site_1",
    "lamport": 65,
    "type": "insert",

@@ -109,9 +109,7 @@ def test_concurrent_editing_during_revert_converges() -> None:
     services.apply_operation(doc.id, Op.create_insert("s1", c3, c2, "C"), user)
 
     # 1. Client A generates revert ops to state at seq 1 ("A")
-    revert_ops, _ = services.generate_revert_operations(
-        doc.id, target_seq=1, site_id="site_revert"
-    )
+    revert_ops, _ = services.generate_revert_operations(doc.id, target_seq=1, site_id="site_revert")
 
     # 2. Client B concurrently generates an insert of "Z" after "A"
     cz = CharId(10, "client_b")

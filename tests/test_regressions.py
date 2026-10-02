@@ -378,3 +378,48 @@ def test_owner_pages_render(shared_doc: dict) -> None:
     assert shared_doc["doc"] in listing.context["documents"]
 
     assert client.get(f"/docs/{doc_id}/share/").json()["owner"] == "owner"
+
+
+def test_owner_can_invite_collaborator_by_email(shared_doc: dict) -> None:
+    outsider = shared_doc["outsider"]
+    outsider.email = "Outsider@Example.com"
+    outsider.save()
+    client = Client()
+    client.force_login(shared_doc["doc"].owner)
+
+    resp = client.post(
+        f"/docs/{shared_doc['doc'].id}/share/",
+        data={"username": "outsider@example.com", "role": "viewer"},
+        content_type="application/json",
+    )
+
+    assert resp.status_code == 200, resp.content
+    assert resp.json()["collaborator"]["username"] == outsider.username
+    assert Collaborator.objects.filter(
+        document=shared_doc["doc"], user=outsider, role="viewer"
+    ).exists()
+
+
+def test_invite_unknown_email_is_rejected(shared_doc: dict) -> None:
+    client = Client()
+    client.force_login(shared_doc["doc"].owner)
+    resp = client.post(
+        f"/docs/{shared_doc['doc'].id}/share/",
+        data={"username": "nobody@example.com"},
+        content_type="application/json",
+    )
+    assert resp.status_code == 404
+
+
+def test_registration_records_email(db: None) -> None:
+    resp = Client().post(
+        "/accounts/register/",
+        {
+            "username": "newbie",
+            "email": "Newbie@Example.com",
+            "password1": "a-Strong-pass-123",
+            "password2": "a-Strong-pass-123",
+        },
+    )
+    assert resp.status_code == 302, resp.content
+    assert User.objects.get(username="newbie").email == "newbie@example.com"

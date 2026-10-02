@@ -21,7 +21,6 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from benchmarks.legacy.ids import CharId as LegacyCharId
 from benchmarks.legacy.rga import RGA as LegacyRGA
 from crdt.rga import RGA
 
@@ -59,13 +58,13 @@ def positional(n: int, repeat: int) -> dict[str, Any]:
     for name, doc in (("legacy", build_legacy(n)), ("current", build_new(n))):
         rng = random.Random(n)
 
-        def insert(d: Any = doc) -> None:
+        def insert(d: Any = doc, rng: random.Random = rng) -> None:
             d.local_insert(rng.randint(0, d.visible_len()), "y")
 
-        def delete(d: Any = doc) -> None:
+        def delete(d: Any = doc, rng: random.Random = rng) -> None:
             d.local_delete(rng.randint(0, d.visible_len() - 1))
 
-        def lookup(d: Any = doc) -> None:
+        def lookup(d: Any = doc, rng: random.Random = rng) -> None:
             d.pos_of_char_id(d.char_id_at(rng.randint(0, d.visible_len() - 1)))
 
         out[name] = {
@@ -190,7 +189,9 @@ def main() -> None:
     results: dict[str, Any] = {
         "machine": f"{platform.processor()} / {platform.system()} {platform.release()}",
         "python": platform.python_version(),
-        "positional": [positional(n, repeat) for n, repeat in ((1_000, 400), (10_000, 200), (100_000, 50))],
+        "positional": [
+            positional(n, repeat) for n, repeat in ((1_000, 400), (10_000, 200), (100_000, 50))
+        ],
         "paste": [paste(100_000, 1_000), paste(100_000, 10_000)],
         "remote_apply": remote_apply(20_000),
         "snapshot": snapshot_sizes(),

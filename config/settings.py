@@ -13,6 +13,16 @@ def env_bool(name: str, default: bool = False) -> bool:
     return os.environ.get(name, str(default)).lower() in ("true", "1", "yes")
 
 
+# Pick up a local .env (GROQ_API_KEY etc.) when running outside Docker. Real
+# environment variables always win.
+if not env_bool("SKIP_DOTENV"):
+    try:
+        from dotenv import load_dotenv
+
+        load_dotenv(BASE_DIR / ".env", override=False)
+    except ImportError:
+        pass
+
 DEBUG = env_bool("DEBUG", False)
 
 SECRET_KEY = os.environ.get("SECRET_KEY", "")
@@ -67,6 +77,7 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "documents.context_processors.static_version",
             ],
         },
     },

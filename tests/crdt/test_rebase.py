@@ -81,7 +81,9 @@ def test_rebase_without_local_history_appends() -> None:
     server = RGA("server")
     alice = RGA("alice")
     server.apply(alice.local_insert(0, "abc"))
-    orphan = Op.create_insert("bob", alice.char_id_at(0).__class__(99, "bob"), alice.char_id_at(1), "!")
+    orphan = Op.create_insert(
+        "bob", alice.char_id_at(0).__class__(99, "bob"), alice.char_id_at(1), "!"
+    )
     server.apply(alice.local_delete(1, 1))
     server.compact()
     fresh = RGA.from_dict(server.to_dict(), site_id="bob")

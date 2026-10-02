@@ -30,6 +30,9 @@ class CollaborativeEditorApp {
     this.aiStatusText = document.getElementById('aiStatusText');
     this.cancelAiBtn = document.getElementById('cancelAiBtn');
     this.floatingToolbar = document.getElementById('floatingAiToolbar');
+    this.aiMenu = document.getElementById('aiMenu');
+    this.aiMenuBtn = document.getElementById('aiMenuBtn');
+    this.aiMenuHint = document.getElementById('aiMenuHint');
     this.suggestionCard = document.getElementById('suggestionCard');
 
     // 1. Initialize local CRDT replica
@@ -65,6 +68,7 @@ class CollaborativeEditorApp {
       onPresenceReceived: (data) => this.presence.handleRemotePresence(data),
       onStatusChange: (status) => this._handleStatusChange(status),
       onAIStatusReceived: (msg) => this._handleAIStatus(msg),
+      onServerError: (msg) => this._handleServerError(msg),
       onMissedSummaryReceived: (msg) => this._handleMissedSummary(msg),
       onSuggestionReceived: (msg) => this._handleSuggestion(msg),
       onSuggestionUpdated: (msg) => this._handleSuggestionUpdated(msg)
@@ -111,11 +115,33 @@ class CollaborativeEditorApp {
     if (this.floatingToolbar) {
       const buttons = this.floatingToolbar.querySelectorAll('button[data-action]');
       buttons.forEach((btn) => {
+        // Keep focus (and the visible selection) in the textarea.
+        btn.addEventListener('mousedown', (e) => e.preventDefault());
         btn.addEventListener('click', (e) => {
           e.preventDefault();
           const action = btn.getAttribute('data-action');
           this._triggerAIAction(action);
         });
+      });
+    }
+
+    if (this.aiMenu && this.aiMenuBtn) {
+      this.aiMenuBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this._toggleAiMenu(!this.aiMenu.classList.contains('is-open'));
+      });
+      this.aiMenu.querySelectorAll('button[data-action]').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          this._toggleAiMenu(false);
+          this._triggerAIAction(btn.getAttribute('data-action'));
+        });
+      });
+      document.addEventListener('click', (e) => {
+        if (!this.aiMenu.contains(e.target)) this._toggleAiMenu(false);
+      });
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') this._toggleAiMenu(false);
       });
     }
 
@@ -214,8 +240,15 @@ class CollaborativeEditorApp {
     if (end > start) {
       this.floatingToolbar.style.display = 'flex';
       const coords = this.presence._getCaretCoordinates(start);
-      const top = Math.max(10, coords.top - 48);
-      const left = Math.max(120, coords.left);
+      const toolbarHeight = this.floatingToolbar.offsetHeight || 40;
+      const containerWidth = this.textarea.clientWidth;
+      const halfWidth = (this.floatingToolbar.offsetWidth || 400) / 2;
+      // Sit above the selection, or below it when there is no room (first lines);
+      // the container clips overflow, so a toolbar above line 1 would be invisible.
+      const below = coords.top < toolbarHeight + 12;
+      this.floatingToolbar.classList.toggle('is-below', below);
+      const top = below ? coords.top + coords.height : coords.top;
+      const left = Math.min(Math.max(halfWidth + 8, coords.left), containerWidth - halfWidth - 8);
       this.floatingToolbar.style.top = `${top}px`;
       this.floatingToolbar.style.left = `${left}px`;
     } else {
@@ -223,30 +256,73 @@ class CollaborativeEditorApp {
     }
   }
 
+  _toggleAiMenu(open) {
+    if (!this.aiMenu) return;
+    if (open && this.aiMenuHint) {
+      const hasSelection = this.textarea.selectionEnd > this.textarea.selectionStart;
+      this.aiMenuHint.textContent = hasSelection
+        ? 'Applies to the selected text'
+        : 'Applies to the whole document';
+    }
+    this.aiMenu.classList.toggle('is-open', open);
+    if (this.aiMenuBtn) this.aiMenuBtn.setAttribute('aria-expanded', String(open));
+  }
+
   _triggerAIAction(action) {
     const start = this.textarea.selectionStart;
     const end = this.textarea.selectionEnd;
+    const hasSelection = end > start;
 
+    if (this.activeAiJobId) {
+      if (window.toast) toast.warning('An AI request is already running');
+      return;
+    }
+    if (!this.textarea.value.trim()) {
+      if (window.toast) toast.warning('Write something first: AI works on existing text');
+      return;
+    }
+    if (!this.sync.isConnected) {
+      if (window.toast) toast.error('Not connected: AI requests need a live connection');
+      return;
+    }
+
+    // Anchors are the first and last selected characters; with no selection both
+    // are omitted and the server uses the whole document.
     let startAnchor = null;
     let endAnchor = null;
+    if (hasSelection) {
+      const first = this._anchorBefore(this._nextOffset(start));
+      const last = this._anchorBefore(end);
+      if (first) startAnchor = first.toString();
+      if (last) endAnchor = last.toString();
+    }
 
-    const startAnchorId = this._anchorBefore(start);
-    const endAnchorId = this._anchorBefore(end);
-    if (startAnchorId) startAnchor = startAnchorId.toString();
-    if (endAnchorId) endAnchor = endAnchorId.toString();
-
+    const target = hasSelection ? 'selected text' : 'the whole document';
     this.sync.sendAIRequest({
       kind: action,
       anchor_start: startAnchor,
       anchor_end: endAnchor,
-      instruction: `Perform ${action} on selected text`
+      instruction: `Perform ${action} on ${target}`
     });
 
     if (this.floatingToolbar) {
       this.floatingToolbar.style.display = 'none';
     }
     if (window.toast) {
-      toast.info(`AI ${action} requested...`);
+      toast.info(`AI ${action} requested for ${target}...`);
+    }
+  }
+
+  /** UTF-16 offset just past the code point starting at `utf16Pos`. */
+  _nextOffset(utf16Pos) {
+    const code = this.textarea.value.codePointAt(utf16Pos);
+    return utf16Pos + (code !== undefined && code > 0xffff ? 2 : 1);
+  }
+
+  _handleServerError(msg) {
+    if (!window.toast) return;
+    if (['rate_limited', 'token_budget_exceeded', 'forbidden', 'bad_request'].includes(msg.code)) {
+      toast.error(msg.message || 'Request failed');
     }
   }
 
@@ -258,8 +334,11 @@ class CollaborativeEditorApp {
       this.aiStatusPill.style.display = 'inline-flex';
       this.aiStatusText.textContent = msg.status === 'queued' ? 'AI queued...' : 'AI writing...';
     } else if (msg.status === 'done') {
-      this.aiStatusText.textContent = 'AI edit applied ✓';
-      if (window.toast) toast.success('AI changes applied successfully');
+      const isSuggestion = (msg.message || '').startsWith('Suggestion');
+      this.aiStatusText.textContent = isSuggestion ? 'AI suggestion ready ✓' : 'AI edit applied ✓';
+      if (window.toast) {
+        toast.success(isSuggestion ? 'AI suggestion ready for review' : 'AI changes applied successfully');
+      }
       setTimeout(() => {
         this.aiStatusPill.style.display = 'none';
       }, 2500);
@@ -273,7 +352,7 @@ class CollaborativeEditorApp {
       this.activeAiJobId = null;
     } else if (msg.status === 'failed') {
       this.aiStatusText.textContent = 'AI error';
-      if (window.toast) toast.error('AI generation encountered an error');
+      if (window.toast) toast.error(msg.message ? `AI failed: ${msg.message}` : 'AI generation encountered an error');
       setTimeout(() => {
         this.aiStatusPill.style.display = 'none';
       }, 2000);

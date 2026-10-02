@@ -4,7 +4,7 @@
  "num_sites": 5,
  "operations": [
   {
-   "op_id": "33d9e835dda145268bf3c93b9a801b5d",
+   "op_id": "aa51ed01ecc64f4892b50e6060df7fbd",
    "site_id": "site_0",
    "lamport": 2,
    "type": "insert",
@@ -13,7 +13,7 @@
    "text": "MF"
   },
   {
-   "op_id": "e019e1951f5c46558d9931a902c8f50d",
+   "op_id": "1143572468e14aba90db3ca1c845473a",
    "site_id": "site_4",
    "lamport": 6,
    "type": "insert",
@@ -22,7 +22,7 @@
    "text": "78C"
   },
   {
-   "op_id": "df0e902d3dcc4693a8ca0048746cb0a9",
+   "op_id": "8a7760270c59451e82e989aea89a0d88",
    "site_id": "site_1",
    "lamport": 4,
    "type": "insert",
@@ -31,7 +31,7 @@
    "text": "🚀"
   },
   {
-   "op_id": "e68ef1b3ea484b55bb99d0542146e5ec",
+   "op_id": "c8e7aa3e70944d2f9d4cff9d1042c711",
    "site_id": "site_2",
    "lamport": 6,
    "type": "delete",
@@ -47,7 +47,7 @@
    ]
   },
   {
-   "op_id": "f3ba909340c8494ea0a99d99a60c3e71",
+   "op_id": "4f33231a77674e839f5cadd04f640913",
    "site_id": "site_4",
    "lamport": 10,
    "type": "insert",
@@ -56,7 +56,7 @@
    "text": "7PB"
   },
   {
-   "op_id": "bfbbd59ae8954304a564e0a7547e929c",
+   "op_id": "c0dfe42e0ece40008e95c682e33ea310",
    "site_id": "site_3",
    "lamport": 9,
    "type": "delete",
@@ -68,7 +68,7 @@
    ]
   },
   {
-   "op_id": "f1d177bd040a4311887e27c6e06483e0",
+   "op_id": "be4b36f3fa5847f7ac52dce226138ddd",
    "site_id": "site_3",
    "lamport": 10,
    "type": "delete",
@@ -80,7 +80,7 @@
    ]
   },
   {
-   "op_id": "8028c1f353184530b727b0fee5767f02",
+   "op_id": "3c55da44e50d4f04ab5ca41c14ee9782",
    "site_id": "site_0",
    "lamport": 13,
    "type": "insert",
@@ -89,7 +89,7 @@
    "text": "G"
   },
   {
-   "op_id": "7f159e16a0d542afacc1a2f399b76d65",
+   "op_id": "d7b6079e953c4df2b132e2a3bcd35011",
    "site_id": "site_1",
    "lamport": 15,
    "type": "insert",
@@ -98,7 +98,7 @@
    "text": "🚀"
   },
   {
-   "op_id": "d8192870dbad4ba4ba409c4625b5ded8",
+   "op_id": "c9f10fb922054af3869234ce26d6fe69",
    "site_id": "site_4",
    "lamport": 12,
    "type": "insert",
@@ -107,7 +107,7 @@
    "text": "Q"
   },
   {
-   "op_id": "cd1b2172c12c40c38fa5f6931e6d0809",
+   "op_id": "837020cf903c42b389213b42ca25128d",
    "site_id": "site_4",
    "lamport": 14,
    "type": "delete",
@@ -119,7 +119,7 @@
    ]
   },
   {
-   "op_id": "2af2cd296580417cbcca54af2e0b7d95",
+   "op_id": "3b95b3250ba4499bb1bc5a2f6ad313d2",
    "site_id": "site_2",
    "lamport": 20,
    "type": "insert",
@@ -128,7 +128,7 @@
    "text": "C43"
   },
   {
-   "op_id": "476cd46f924546bc9944a108446e791d",
+   "op_id": "04185b29534041ef8ebaa86e1967ac5e",
    "site_id": "site_2",
    "lamport": 24,
    "type": "insert",
@@ -137,7 +137,7 @@
    "text": "EM36"
   },
   {
-   "op_id": "784c0676751240e7afa02b547633e37a",
+   "op_id": "dce1515dc18649dc8ed09b154a28c190",
    "site_id": "site_0",
    "lamport": 16,
    "type": "delete",
@@ -153,7 +153,7 @@
    ]
   },
   {
-   "op_id": "3dcb7ab736124badbc59e6ab18e63318",
+   "op_id": "ad51184303654cf683506879ef6fecc8",
    "site_id": "site_1",
    "lamport": 21,
    "type": "insert",
@@ -162,7 +162,7 @@
    "text": "RCéQ"
   },
   {
-   "op_id": "651b783f9b384c20a3319d65338c3319",
+   "op_id": "a946d4da68de487a836110f5437d3e2e",
    "site_id": "site_2",
    "lamport": 28,
    "type": "delete",
@@ -174,7 +174,7 @@
    ]
   },
   {
-   "op_id": "0242ed39a30145659dc084f5ad17b720",
+   "op_id": "e90583f901dd44a5894be04183ad6ae3",
    "site_id": "site_2",
    "lamport": 33,
    "type": "insert",
@@ -183,7 +183,7 @@
    "text": "B0YMC"
   },
   {
-   "op_id": "1f34c31654904fe294a39c5ed6cabb72",
+   "op_id": "1cd146d16fe74a0d8a57c6d5d1a43bbe",
    "site_id": "site_3",
    "lamport": 28,
    "type": "insert",
@@ -192,7 +192,7 @@
    "text": "4R"
   },
   {
-   "op_id": "e1e09ee124754a7882b3c7378a233012",
+   "op_id": "b1a36e2778744df1a233dbd1d3a94b02",
    "site_id": "site_4",
    "lamport": 30,
    "type": "delete",
@@ -204,7 +204,7 @@
    ]
   },
   {
-   "op_id": "50123d0da947467b99954fbc5ed58398",
+   "op_id": "27b328af1610447281e969d3faafc6ed",
    "site_id": "site_1",
    "lamport": 37,
    "type": "insert",
@@ -213,7 +213,7 @@
    "text": "Y99"
   },
   {
-   "op_id": "9752cc303d4c488da6adfe15e833e28e",
+   "op_id": "29c45c156bcf461bb8968248ed27fc1f",
    "site_id": "site_1",
    "lamport": 42,
    "type": "insert",
@@ -222,7 +222,7 @@
    "text": "36IJ"
   },
   {
-   "op_id": "f7ca68e5e34a48d7bbdb2f0dde92e676",
+   "op_id": "4be954f831e140e4967fd4922a8d69b1",
    "site_id": "site_3",
    "lamport": 39,
    "type": "delete",
@@ -242,7 +242,7 @@
    ]
   },
   {
-   "op_id": "c64e4a846bb743ee8c43176851b85821",
+   "op_id": "415889698e3d499a801e75ea86c52302",
    "site_id": "site_0",
    "lamport": 44,
    "type": "insert",
@@ -251,7 +251,7 @@
    "text": "R"
   },
   {
-   "op_id": "2f58f5dcc1194d1797a295e3fcf01a4f",
+   "op_id": "5f733e0d56bb47bd9f273c8b46f4c592",
    "site_id": "site_3",
    "lamport": 48,
    "type": "insert",
@@ -260,7 +260,7 @@
    "text": "B6Q"
   },
   {
-   "op_id": "3ca1a2a5688d4a3ba129670cbb192ad5",
+   "op_id": "fd9db956d8cc4f7dad7b3323c3bb0859",
    "site_id": "site_4",
    "lamport": 50,
    "type": "insert",
@@ -269,7 +269,7 @@
    "text": "H"
   },
   {
-   "op_id": "ba2489e49d2c463785cd9b4b7384a407",
+   "op_id": "855b4dd956c34b918b017201d17e7b0d",
    "site_id": "site_4",
    "lamport": 52,
    "type": "insert",
@@ -278,7 +278,7 @@
    "text": "NG"
   },
   {
-   "op_id": "3ba867ebd6d141778a52b3c04f97efd3",
+   "op_id": "fddbdc27087345829e5a59161381606c",
    "site_id": "site_4",
    "lamport": 55,
    "type": "insert",
@@ -287,7 +287,7 @@
    "text": "NW"
   },
   {
-   "op_id": "e31f8a441b394149a3c554b95b54cd96",
+   "op_id": "7b99b1c6e95c4a61ab08b24e03aa6d7e",
    "site_id": "site_4",
    "lamport": 59,
    "type": "insert",
@@ -296,7 +296,7 @@
    "text": "SW3"
   },
   {
-   "op_id": "77c9883c4b0f4125aebb11bf791b9812",
+   "op_id": "418abffec4ef494d84fec422cd89eee7",
    "site_id": "site_2",
    "lamport": 64,
    "type": "insert",
@@ -305,7 +305,7 @@
    "text": "_SCW"
   },
   {
-   "op_id": "78ce82298874488ba76075bcc61dedfb",
+   "op_id": "ecf67f6b5b404cfea76042b8f147c88e",
    "site_id": "site_0",
    "lamport": 67,
    "type": "insert",
@@ -314,7 +314,7 @@
    "text": "6N"
   },
   {
-   "op_id": "2f9da9e4100a49d3be170c9e5670d46f",
+   "op_id": "feb6dc0dfa484df9b435a4d5fc270148",
    "site_id": "site_3",
    "lamport": 69,
    "type": "delete",
@@ -326,7 +326,7 @@
    ]
   },
   {
-   "op_id": "49ffdb4b679b4afa9ea53b5a5491a8f4",
+   "op_id": "d3ff169fbfae420fae5f1358d311987b",
    "site_id": "site_4",
    "lamport": 70,
    "type": "insert",
@@ -335,7 +335,7 @@
    "text": "DOWNS"
   },
   {
-   "op_id": "b6570603ab0b41e0b4c824d534ff23ca",
+   "op_id": "fc11dc6a74aa4242ab9b03aa3883b3c2",
    "site_id": "site_4",
    "lamport": 75,
    "type": "insert",
@@ -344,7 +344,7 @@
    "text": "ESL_3"
   },
   {
-   "op_id": "5a42f0e557594754baa84b406a1d6396",
+   "op_id": "db110f5640964a9ab74bab9f06139319",
    "site_id": "site_3",
    "lamport": 70,
    "type": "delete",
@@ -356,7 +356,7 @@
    ]
   },
   {
-   "op_id": "4f09c3f540c448deb14791bb247968b1",
+   "op_id": "9a068f88e2c440c38754f2df986b2354",
    "site_id": "site_0",
    "lamport": 77,
    "type": "insert",
@@ -365,7 +365,7 @@
    "text": "6"
   },
   {
-   "op_id": "0459d196c4cb4b739ff7deb60f1ad1bd",
+   "op_id": "37cdc5ee036c49b5bf303dc140c08c36",
    "site_id": "site_3",
    "lamport": 71,
    "type": "insert",
@@ -374,7 +374,7 @@
    "text": "é"
   },
   {
-   "op_id": "3a7eae99ba694bdea7817fc9e3360f1f",
+   "op_id": "753c8738a98d403580de81a0058f67e4",
    "site_id": "site_3",
    "lamport": 72,
    "type": "delete",
@@ -386,7 +386,7 @@
    ]
   },
   {
-   "op_id": "58534eff710f40f490bddda37687fd58",
+   "op_id": "c6cc35fc6d3d4b2c9210f22034ee5c5c",
    "site_id": "site_3",
    "lamport": 74,
    "type": "insert",
@@ -395,7 +395,7 @@
    "text": "Y6"
   },
   {
-   "op_id": "27742460338143218e4f52d520b585d1",
+   "op_id": "49943f4ca9c5488da9e5ddfdf042162f",
    "site_id": "site_2",
    "lamport": 83,
    "type": "insert",
@@ -404,7 +404,7 @@
    "text": "8🚀OV"
   },
   {
-   "op_id": "fe4720fa8aa44863b868e7acce0c3511",
+   "op_id": "e38cd2dda2e64fc3a4f94475e50146da",
    "site_id": "site_3",
    "lamport": 85,
    "type": "insert",
@@ -413,7 +413,7 @@
    "text": "T"
   },
   {
-   "op_id": "431f98ee3ae44da88d08f8596d2e0455",
+   "op_id": "f513edfc07234bbb8399178fe5ec798b",
    "site_id": "site_2",
    "lamport": 87,
    "type": "insert",
@@ -422,7 +422,7 @@
    "text": "9"
   },
   {
-   "op_id": "812fd4abf161465385f7f893d5b1c804",
+   "op_id": "21fa713852e64086b37966847c8b64e4",
    "site_id": "site_2",
    "lamport": 89,
    "type": "insert",
@@ -431,7 +431,7 @@
    "text": "_Q"
   },
   {
-   "op_id": "00081d878547450d9dabe839bc4f8524",
+   "op_id": "12f8b63d378b4db1b743b2033a15efa2",
    "site_id": "site_4",
    "lamport": 93,
    "type": "insert",
@@ -440,7 +440,7 @@
    "text": "WK😀"
   },
   {
-   "op_id": "975fd220e6014020b895acfa699991c4",
+   "op_id": "89f51db08c9242f6af8fbaa355f35c28",
    "site_id": "site_2",
    "lamport": 95,
    "type": "delete",
@@ -452,7 +452,7 @@
    ]
   },
   {
-   "op_id": "afe607dcc04f4b1fa8b907480376efac",
+   "op_id": "cf61a39ba21b459fb2f2c3fb70a9f5fd",
    "site_id": "site_0",
    "lamport": 97,
    "type": "insert",
@@ -461,7 +461,7 @@
    "text": "4"
   },
   {
-   "op_id": "852afbff07a0466c9d13b18f77c94bce",
+   "op_id": "eb5af810b8694ccdbd3bd737a3af49b9",
    "site_id": "site_3",
    "lamport": 99,
    "type": "delete",
@@ -481,7 +481,7 @@
    ]
   },
   {
-   "op_id": "647248a378204cadb4fb342f2270352f",
+   "op_id": "339fc24a971b46ce982ae2fd1a099259",
    "site_id": "site_2",
    "lamport": 100,
    "type": "insert",
@@ -490,7 +490,7 @@
    "text": "G7"
   },
   {
-   "op_id": "2c2d9df19dd14ec1a543ae2d0f7fdb97",
+   "op_id": "36bd4e9247a7425ba6336eb55eb674aa",
    "site_id": "site_1",
    "lamport": 100,
    "type": "insert",
@@ -499,7 +499,7 @@
    "text": "4D"
   },
   {
-   "op_id": "57973df484fc47a6ab3614c971c45585",
+   "op_id": "dbe2b84a5c9542788527fad32523286b",
    "site_id": "site_2",
    "lamport": 106,
    "type": "insert",
@@ -508,7 +508,7 @@
    "text": "IRVF7"
   },
   {
-   "op_id": "29fb2c6855ef4020aa0d8c22cb7eceec",
+   "op_id": "a482de4586d9497f8e916a2602f649fc",
    "site_id": "site_1",
    "lamport": 103,
    "type": "insert",
@@ -517,7 +517,7 @@
    "text": "_W"
   },
   {
-   "op_id": "757890c90bf9405d8e4368b160a08e71",
+   "op_id": "03225bb13f014b1eac1e7d41a8e07776",
    "site_id": "site_2",
    "lamport": 109,
    "type": "insert",
@@ -526,7 +526,7 @@
    "text": "L2"
   },
   {
-   "op_id": "3a0e8a881f174eff8c0497046decfb7b",
+   "op_id": "a6ae80a341ba41f29480ac75bb83659f",
    "site_id": "site_1",
    "lamport": 111,
    "type": "delete",
@@ -538,7 +538,7 @@
    ]
   },
   {
-   "op_id": "6440493ee5724edf9f93633a6d1cb073",
+   "op_id": "5d5d2556fd854c55a202645dafe026c8",
    "site_id": "site_0",
    "lamport": 113,
    "type": "delete",
@@ -550,7 +550,7 @@
    ]
   },
   {
-   "op_id": "fd483f7822ee471fbd5f681b2a10853e",
+   "op_id": "2baca056780b455f9488ad6b5ed671c5",
    "site_id": "site_2",
    "lamport": 115,
    "type": "delete",
@@ -562,7 +562,7 @@
    ]
   },
   {
-   "op_id": "56bb42381f6f47ce814ae2033aaca4e4",
+   "op_id": "226986669ac8467fa769279272be531c",
    "site_id": "site_2",
    "lamport": 121,
    "type": "insert",
@@ -571,7 +571,7 @@
    "text": "6😀4KK"
   },
   {
-   "op_id": "b0fdeca3c20b4253a69c72680421a36d",
+   "op_id": "7a8051f0c6dd481bb158f68d756f911f",
    "site_id": "site_4",
    "lamport": 117,
    "type": "delete",
@@ -583,7 +583,7 @@
    ]
   },
   {
-   "op_id": "a7d93f987d4247008a05bcb4e519309b",
+   "op_id": "feda64a1f213436ca8b8ea8116435d10",
    "site_id": "site_4",
    "lamport": 122,
    "type": "insert",
@@ -592,7 +592,7 @@
    "text": "6IUKT"
   },
   {
-   "op_id": "ccc2dfd3f1814585b5693ee0d727ddcd",
+   "op_id": "9a913e4e293547ebafdb0a4a71abfc9b",
    "site_id": "site_1",
    "lamport": 125,
    "type": "insert",
@@ -601,7 +601,7 @@
    "text": "VB"
   },
   {
-   "op_id": "dfdf2e35b5da4f26a3daa8bdd5350b95",
+   "op_id": "666cd852e3a446d3a187873754476ea7",
    "site_id": "site_1",
    "lamport": 128,
    "type": "insert",
@@ -610,7 +610,7 @@
    "text": "S5"
   },
   {
-   "op_id": "105b315ef72043858451f1a17d8a88a3",
+   "op_id": "47cb6986e60d4b49a3bf88fde7983a3d",
    "site_id": "site_0",
    "lamport": 126,
    "type": "insert",
@@ -619,7 +619,7 @@
    "text": "R9E"
   },
   {
-   "op_id": "3aff1885eacc419391cd715aab52678a",
+   "op_id": "d63f64c04cc94536b25d4eae76f99175",
    "site_id": "site_1",
    "lamport": 134,
    "type": "insert",
@@ -628,7 +628,7 @@
    "text": "JGQX"
   },
   {
-   "op_id": "b0ed9bdbb616444ebd0839a95d0d9371",
+   "op_id": "351166f2be5d4bc9a97019a59da58ef7",
    "site_id": "site_2",
    "lamport": 136,
    "type": "delete",
@@ -640,7 +640,7 @@
    ]
   },
   {
-   "op_id": "684e1b72db884135974b4f60c1429f8d",
+   "op_id": "322dd10619874e7bb38e69eb3c060f55",
    "site_id": "site_3",
    "lamport": 131,
    "type": "delete",
@@ -652,7 +652,7 @@
    ]
   },
   {
-   "op_id": "f3532f297f1a4829b8dd1595f6bd1817",
+   "op_id": "17e6f4cd7a50434882ef612018ed4379",
    "site_id": "site_0",
    "lamport": 140,
    "type": "insert",
@@ -661,7 +661,7 @@
    "text": "K0"
   },
   {
-   "op_id": "a276e54db0ab440daf3bb6f0999af612",
+   "op_id": "761d217b00b34c69a78effda0994301f",
    "site_id": "site_3",
    "lamport": 144,
    "type": "insert",
@@ -670,7 +670,7 @@
    "text": "LG😀"
   },
   {
-   "op_id": "efea7d65b7bc4a6396fd36b4c5ac4a88",
+   "op_id": "7cd981dcc5c24b058a6a81ba6fd08910",
    "site_id": "site_2",
    "lamport": 147,
    "type": "insert",
@@ -679,7 +679,7 @@
    "text": "😀0"
   },
   {
-   "op_id": "6f14c862970f4beebaeed785cd637149",
+   "op_id": "642a23b8768f43b79a87c12ce5faaced",
    "site_id": "site_3",
    "lamport": 149,
    "type": "insert",
@@ -688,7 +688,7 @@
    "text": "8"
   },
   {
-   "op_id": "4b3ece6478fa438b83b414264da8a084",
+   "op_id": "ac1b20be4709447f8e9010e6885baf36",
    "site_id": "site_4",
    "lamport": 153,
    "type": "insert",
@@ -697,7 +697,7 @@
    "text": "UI_Z6"
   },
   {
-   "op_id": "5f27dafbdf9f4905bc1ca1d421694b84",
+   "op_id": "b4e302ddac82454a96342f8c7b89ea8f",
    "site_id": "site_2",
    "lamport": 153,
    "type": "insert",
@@ -706,7 +706,7 @@
    "text": "é025é"
   },
   {
-   "op_id": "2bd9d48a2422462ea233c76b1802407b",
+   "op_id": "94223e3a2c9b4cf69c6a1d2a5b5f5f31",
    "site_id": "site_1",
    "lamport": 151,
    "type": "delete",
@@ -718,7 +718,7 @@
    ]
   },
   {
-   "op_id": "60488fa517604d89943fa1db6930774b",
+   "op_id": "cce9d73d76394218b741d34c01ca2991",
    "site_id": "site_4",
    "lamport": 159,
    "type": "insert",
@@ -727,7 +727,7 @@
    "text": "A🚀PE"
   },
   {
-   "op_id": "042dea0590e94aac8b92011f6289455a",
+   "op_id": "e6c4eb3dbf04424c95b2fc637ced8f23",
    "site_id": "site_3",
    "lamport": 161,
    "type": "insert",
@@ -736,7 +736,7 @@
    "text": "😀"
   },
   {
-   "op_id": "f31afa631e474afba821e07d02bbcc7e",
+   "op_id": "5e3093f8c7f5433b8d78813d0892d9e7",
    "site_id": "site_1",
    "lamport": 162,
    "type": "insert",
@@ -745,7 +745,7 @@
    "text": "01"
   },
   {
-   "op_id": "765d3c6866144609b73965e1a558fb93",
+   "op_id": "4d42df28ea0c48779ab6f6a44f5e36ce",
    "site_id": "site_2",
    "lamport": 166,
    "type": "insert",
@@ -754,7 +754,7 @@
    "text": "éSLY"
   },
   {
-   "op_id": "63ec09fe12754970b264ad79a0f2a189",
+   "op_id": "0a5921bd85164096b101d8d6d2fe3159",
    "site_id": "site_3",
    "lamport": 163,
    "type": "insert",
@@ -763,7 +763,7 @@
    "text": "1P"
   },
   {
-   "op_id": "23ddef6dae1c444db55fccedfe2ffaeb",
+   "op_id": "23a5702c90d547c6af2924b6a460ece6",
    "site_id": "site_0",
    "lamport": 169,
    "type": "insert",
@@ -772,7 +772,7 @@
    "text": "V"
   },
   {
-   "op_id": "745eaae643d3468d910b65a456761752",
+   "op_id": "f8d3efdf629b4d7eb18b5c12d013f7ab",
    "site_id": "site_1",
    "lamport": 169,
    "type": "delete",
@@ -788,7 +788,7 @@
    ]
   },
   {
-   "op_id": "1282edbf038b4403896fa7db82ae8502",
+   "op_id": "11b1c4ca3cb8465cb00232b6db5aac64",
    "site_id": "site_2",
    "lamport": 175,
    "type": "insert",
@@ -797,7 +797,7 @@
    "text": "I2INN"
   },
   {
-   "op_id": "7db34540b1b94037aabc9fa17006ef70",
+   "op_id": "3d04951e3ced4326a6d6d3c3c125ccf1",
    "site_id": "site_1",
    "lamport": 171,
    "type": "insert",
@@ -806,7 +806,7 @@
    "text": "O"
   },
   {
-   "op_id": "58ec406cdea24d30a27e44c183602a85",
+   "op_id": "a45ae1732d1d451d9f5e80abc8e5d9d5",
    "site_id": "site_4",
    "lamport": 171,
    "type": "insert",
@@ -815,7 +815,7 @@
    "text": "éWY"
   },
   {
-   "op_id": "8b46160307264a7d9cd9bc440d8b40c3",
+   "op_id": "621300198a2f4470890f299c883bd79b",
    "site_id": "site_2",
    "lamport": 182,
    "type": "insert",
@@ -824,7 +824,7 @@
    "text": "CLM😀A"
   },
   {
-   "op_id": "318af6f322a44d7c8ba6fade19582480",
+   "op_id": "181b89e7b6f6439faeb920266f9d0b22",
    "site_id": "site_2",
    "lamport": 183,
    "type": "delete",
@@ -844,7 +844,7 @@
    ]
   },
   {
-   "op_id": "740f9a7286b2414db29311a5331a53a6",
+   "op_id": "d65cccf20d204d118bfe7fc04f1e7c2d",
    "site_id": "site_1",
    "lamport": 184,
    "type": "delete",
@@ -864,7 +864,7 @@
    ]
   },
   {
-   "op_id": "e62302af91af451998c030f06a50e5f8",
+   "op_id": "15ecce9bdcc04cc19292e48b0c2345cd",
    "site_id": "site_3",
    "lamport": 174,
    "type": "insert",
@@ -873,7 +873,7 @@
    "text": "1IOS"
   },
   {
-   "op_id": "0949420943ce41f48fb17057744dedd1",
+   "op_id": "7aa8410d52a449ef9c3c41b9cf9cf45c",
    "site_id": "site_2",
    "lamport": 189,
    "type": "insert",
@@ -882,7 +882,7 @@
    "text": "P77CM"
   },
   {
-   "op_id": "521ebcaa29f9402da4bb1f31d50dd577",
+   "op_id": "c5b2f5bbdc7c45af8854c4a213008415",
    "site_id": "site_1",
    "lamport": 192,
    "type": "insert",
@@ -891,7 +891,7 @@
    "text": "UT"
   },
   {
-   "op_id": "966ae15e734f44a294ceada02e49c5d7",
+   "op_id": "fd37bd1f81494124ab1d88d6c1290392",
    "site_id": "site_0",
    "lamport": 197,
    "type": "insert",
@@ -900,7 +900,7 @@
    "text": "C5SS"
   },
   {
-   "op_id": "611b9b64e16b4fbf84c62cce760729e1",
+   "op_id": "37922b2e4d4141baacaa43fcd7ea1aaf",
    "site_id": "site_0",
    "lamport": 203,
    "type": "insert",
@@ -909,7 +909,7 @@
    "text": "HRFVJ"
   },
   {
-   "op_id": "dec24618253941ae970e840c76e544e4",
+   "op_id": "013e9211910d4f17886d0486e3a17ed0",
    "site_id": "site_3",
    "lamport": 202,
    "type": "insert",
@@ -918,7 +918,7 @@
    "text": "3V🚀X"
   },
   {
-   "op_id": "49c54252c8ea4f34a661bdc23d73029c",
+   "op_id": "fbc22fe827c2463d8c25eadd8d4ad3e7",
    "site_id": "site_0",
    "lamport": 206,
    "type": "insert",
@@ -927,7 +927,7 @@
    "text": "EV"
   },
   {
-   "op_id": "d9ea3da38980449f9368374248537400",
+   "op_id": "f2ddce224f414d6db6b6a42ad7d42cc2",
    "site_id": "site_3",
    "lamport": 203,
    "type": "delete",
@@ -939,7 +939,7 @@
    ]
   },
   {
-   "op_id": "8880ae181e7f47ba8ab240b47daa92e8",
+   "op_id": "5a8c65a3c04b46f28415067b533b51e3",
    "site_id": "site_2",
    "lamport": 205,
    "type": "insert",
@@ -948,7 +948,7 @@
    "text": "3"
   },
   {
-   "op_id": "8ed83743143b444ea0c8fe994ed9f14b",
+   "op_id": "ef0705103d0f4421be2f1971ac1bafb1",
    "site_id": "site_0",
    "lamport": 212,
    "type": "insert",
@@ -957,7 +957,7 @@
    "text": "O8W2O"
   },
   {
-   "op_id": "d315014ac1404055a60ea23ddc28a1dd",
+   "op_id": "bf65c511bf9f4ee187fef26c76bb3bf7",
    "site_id": "site_4",
    "lamport": 218,
    "type": "insert",
@@ -966,7 +966,7 @@
    "text": "5S3RT"
   },
   {
-   "op_id": "6c6dab36e3104ae0abf0ab3cada08fb4",
+   "op_id": "0571d2e223bc471bb22e8dc8347f9faf",
    "site_id": "site_4",
    "lamport": 220,
    "type": "delete",
@@ -990,7 +990,7 @@
    ]
   },
   {
-   "op_id": "d604d42415d3493991c62f10a62df8cf",
+   "op_id": "a490b8b301d64cc89f0e0c33fd0d22e1",
    "site_id": "site_4",
    "lamport": 222,
    "type": "delete",
@@ -1002,7 +1002,7 @@
    ]
   },
   {
-   "op_id": "ce1a556dd1bb4583b8b59412060b8aa6",
+   "op_id": "7028b2db41144adf8171a444cc1355ba",
    "site_id": "site_1",
    "lamport": 208,
    "type": "insert",
@@ -1011,7 +1011,7 @@
    "text": "C5"
   },
   {
-   "op_id": "4a1d871a0d2f458ea34f01d86e3430c8",
+   "op_id": "9a99553a7de4495e934b30442dee5c04",
    "site_id": "site_1",
    "lamport": 212,
    "type": "insert",
@@ -1020,7 +1020,7 @@
    "text": "_5E"
   },
   {
-   "op_id": "cd14d8681ecf4dedae3da5ab53bea8f6",
+   "op_id": "ed7f89f77f1b49358b719810cb26feb3",
    "site_id": "site_1",
    "lamport": 216,
    "type": "insert",
@@ -1029,7 +1029,7 @@
    "text": "G4CD"
   },
   {
-   "op_id": "43396373441143a0a39a2dc3ea2f1bfb",
+   "op_id": "1d7a7832bf374adfbe6914beb0aa4c86",
    "site_id": "site_3",
    "lamport": 223,
    "type": "insert",
@@ -1038,7 +1038,7 @@
    "text": "4EL"
   },
   {
-   "op_id": "e1dfd4c0c33d4807b873e78fb0ee4359",
+   "op_id": "7d43de6637c44e90986bf375cf88dcf2",
    "site_id": "site_0",
    "lamport": 225,
    "type": "insert",
@@ -1047,7 +1047,7 @@
    "text": "R"
   },
   {
-   "op_id": "37d3ad795f704926b51c303b3cb8bc07",
+   "op_id": "1299c9fa08c64c28a122223220bfa7ee",
    "site_id": "site_4",
    "lamport": 229,
    "type": "insert",
@@ -1056,7 +1056,7 @@
    "text": "é9VU"
   },
   {
-   "op_id": "b60fe32f8dd64d24aaa4dcb9867b58b0",
+   "op_id": "c6e1f80902f34331a5c6dc5e18291717",
    "site_id": "site_2",
    "lamport": 235,
    "type": "insert",
@@ -1065,7 +1065,7 @@
    "text": "2XMYB"
   },
   {
-   "op_id": "f0ca1b4efce44954a632ae5b34a54f4c",
+   "op_id": "d3a4d7b39913462bae44e7710c716bef",
    "site_id": "site_0",
    "lamport": 231,
    "type": "delete",
@@ -1077,7 +1077,7 @@
    ]
   },
   {
-   "op_id": "1ec17825da9a446497a06d76f8623ece",
+   "op_id": "809a49f1e18d490c8c2e85847b0c473e",
    "site_id": "site_1",
    "lamport": 239,
    "type": "insert",
@@ -1086,7 +1086,7 @@
    "text": "LO"
   },
   {
-   "op_id": "466f3f8b1eca4ec2b4d1a889b19e2e4c",
+   "op_id": "f4544c701731402086231fd7d070b526",
    "site_id": "site_3",
    "lamport": 241,
    "type": "delete",
@@ -1098,7 +1098,7 @@
    ]
   },
   {
-   "op_id": "d7d21ad60bf24526863edd508f5e6c6d",
+   "op_id": "ed05e8d0130843bb908e3b08c13a914c",
    "site_id": "site_4",
    "lamport": 243,
    "type": "delete",
@@ -1114,7 +1114,7 @@
    ]
   },
   {
-   "op_id": "45c3df8bfeb44ad9a09b03caf3265aef",
+   "op_id": "f3e54ae986f14cccb52af4ff4b5d4cae",
    "site_id": "site_4",
    "lamport": 245,
    "type": "insert",
@@ -1123,7 +1123,7 @@
    "text": "9X"
   },
   {
-   "op_id": "fd2655aa56db4a239086d5844ed0ad7b",
+   "op_id": "9fe918dabc0f41cebc7f1fc702f3ed89",
    "site_id": "site_0",
    "lamport": 251,
    "type": "insert",
@@ -1132,7 +1132,7 @@
    "text": "QéM70"
   },
   {
-   "op_id": "df4ae7eebe2c4922806eb50e5bbf4fd1",
+   "op_id": "8fea1c61e94a4cbd846d26d97e6b3731",
    "site_id": "site_4",
    "lamport": 253,
    "type": "delete",
@@ -1144,7 +1144,7 @@
    ]
   },
   {
-   "op_id": "32995859d7a84504813b1e3f47097743",
+   "op_id": "621e4c6a0bb240a295ab5bf336d37303",
    "site_id": "site_1",
    "lamport": 256,
    "type": "insert",
@@ -1153,7 +1153,7 @@
    "text": "PG"
   },
   {
-   "op_id": "458645ca4fff4043afdd9c3501c4067b",
+   "op_id": "01631dc3ef844b9eb784ff57b8b9cbe1",
    "site_id": "site_4",
    "lamport": 255,
    "type": "delete",
@@ -1169,7 +1169,7 @@
    ]
   },
   {
-   "op_id": "9872ca75227b454fb87bc90d19e6e566",
+   "op_id": "b1ec1587606f446d95ce1d16e5b5ce89",
    "site_id": "site_2",
    "lamport": 257,
    "type": "delete",
@@ -1185,7 +1185,7 @@
    ]
   },
   {
-   "op_id": "dd2a58a579704744a67f84d5f42be5e5",
+   "op_id": "de3ef7c43377447aa2e68768c6ae4661",
    "site_id": "site_0",
    "lamport": 263,
    "type": "insert",
@@ -1194,7 +1194,7 @@
    "text": "7IéH😀"
   },
   {
-   "op_id": "6aa0008b1d7243d7aaebcde6df59487c",
+   "op_id": "1c847cdbb6f84f85b78683e7ba35bf43",
    "site_id": "site_3",
    "lamport": 255,
    "type": "delete",
@@ -1206,7 +1206,7 @@
    ]
   },
   {
-   "op_id": "addba7958f374b9cafaa3ff146966bc0",
+   "op_id": "a4c7553b337443fd831eb35895dc2049",
    "site_id": "site_3",
    "lamport": 260,
    "type": "insert",
@@ -1215,7 +1215,7 @@
    "text": "7BBH5"
   },
   {
-   "op_id": "e587971e4fd6479aafab0dd6d716f613",
+   "op_id": "13bbd98f4e6c4c6585385edcb293519a",
    "site_id": "site_0",
    "lamport": 267,
    "type": "delete",
@@ -1231,7 +1231,7 @@
    ]
   },
   {
-   "op_id": "d64a92e79853411f8c616481207a64a0",
+   "op_id": "34790d24e6b249eab20c7e7b13ea506c",
    "site_id": "site_0",
    "lamport": 269,
    "type": "delete",
@@ -1247,7 +1247,7 @@
    ]
   },
   {
-   "op_id": "e3ee89bc5a224638a16c78b4e1007422",
+   "op_id": "179266b118614924b3344f8521fa54f0",
    "site_id": "site_4",
    "lamport": 271,
    "type": "delete",
@@ -1263,7 +1263,7 @@
    ]
   },
   {
-   "op_id": "8282f000820b4e88a889e6c4ce81e508",
+   "op_id": "8554359fe60b452fb602216961076a3c",
    "site_id": "site_1",
    "lamport": 274,
    "type": "insert",
@@ -1272,7 +1272,7 @@
    "text": "2N"
   },
   {
-   "op_id": "5d4a6b18cec44390b1628757195b05bd",
+   "op_id": "21fe696e55044eaeadfb8dcb0c949d04",
    "site_id": "site_4",
    "lamport": 273,
    "type": "insert",
@@ -1281,7 +1281,7 @@
    "text": "G"
   },
   {
-   "op_id": "4c3c33a380b94fc9947b6ab2c8403002",
+   "op_id": "697857d569b84cdab30129c9f4813687",
    "site_id": "site_3",
    "lamport": 277,
    "type": "delete",
@@ -1297,7 +1297,7 @@
    ]
   },
   {
-   "op_id": "35a8907bd7494988b974a94fa8e4a2fb",
+   "op_id": "fee16a1236264e09b5b85f1af32dcdb0",
    "site_id": "site_3",
    "lamport": 279,
    "type": "delete",
@@ -1309,7 +1309,7 @@
    ]
   },
   {
-   "op_id": "3bd821c5939e4b0e9d8479c7d4a85a04",
+   "op_id": "44238248b1b44f3b9dbb2ebe83638bab",
    "site_id": "site_0",
    "lamport": 281,
    "type": "delete",
@@ -1333,7 +1333,7 @@
    ]
   },
   {
-   "op_id": "579e979d199f4be19e1b688c4d3c3550",
+   "op_id": "ff37e30a23d8447caff27bd7659a2321",
    "site_id": "site_0",
    "lamport": 283,
    "type": "delete",
@@ -1349,7 +1349,7 @@
    ]
   },
   {
-   "op_id": "ebdf35a64f3c4ab49e6aec40cd52b64f",
+   "op_id": "82ded5bbecc44949bb694b4fc65d528f",
    "site_id": "site_1",
    "lamport": 289,
    "type": "insert",
@@ -1358,7 +1358,7 @@
    "text": "4ENGZ"
   },
   {
-   "op_id": "49e7eb1490b9482d8bbc9f3292df67c4",
+   "op_id": "9d790d40915345c89cf91401a0a9f35c",
    "site_id": "site_3",
    "lamport": 283,
    "type": "delete",
@@ -1378,7 +1378,7 @@
    ]
   },
   {
-   "op_id": "b1b70d89addc4111b90036463ea9b095",
+   "op_id": "1e28aa6ef30945e6994ce4d2689d1c04",
    "site_id": "site_3",
    "lamport": 284,
    "type": "delete",
@@ -1394,7 +1394,7 @@
    ]
   },
   {
-   "op_id": "0d89ba9ccc9f4b10be0d15f92c51334a",
+   "op_id": "996f97a8b34649a8a6bf5b6722b1530e",
    "site_id": "site_0",
    "lamport": 291,
    "type": "delete",
@@ -1406,7 +1406,7 @@
    ]
   },
   {
-   "op_id": "fd0b091f5d4e43f7b0ca6b0446f66a5e",
+   "op_id": "5dca5f93a48b4babb2363b6c8e1be258",
    "site_id": "site_2",
    "lamport": 287,
    "type": "insert",
@@ -1415,7 +1415,7 @@
    "text": "VéX"
   },
   {
-   "op_id": "08978bd214494b05b823ed049bf4cbb5",
+   "op_id": "3a99c328866a49688bbd0550a07f3e4b",
    "site_id": "site_1",
    "lamport": 295,
    "type": "insert",
@@ -1424,7 +1424,7 @@
    "text": "MI"
   },
   {
-   "op_id": "15bfeb8d13ed4b12ba8308081881898c",
+   "op_id": "bb1b06b4627c4e32978a5c3e11972c32",
    "site_id": "site_4",
    "lamport": 297,
    "type": "delete",
@@ -1436,7 +1436,7 @@
    ]
   },
   {
-   "op_id": "0e052d8a025f4a53b3cd62f6474405bc",
+   "op_id": "620a2917c6824835b6fb40181b7f353e",
    "site_id": "site_2",
    "lamport": 302,
    "type": "insert",
@@ -1445,7 +1445,7 @@
    "text": "7H_J"
   },
   {
-   "op_id": "695c9b38760b43378e3e1175e1056110",
+   "op_id": "65cb57a4374e460a8532be6cdd6389df",
    "site_id": "site_1",
    "lamport": 304,
    "type": "delete",
@@ -1469,7 +1469,7 @@
    ]
   },
   {
-   "op_id": "5bf85919965f4cc2a406a33d8a70435d",
+   "op_id": "61dc5aab40b844429002a1a5bd9aee12",
    "site_id": "site_0",
    "lamport": 306,
    "type": "delete",
@@ -1481,7 +1481,7 @@
    ]
   },
   {
-   "op_id": "3dc055dec5924d31ac21a7ae099b49a3",
+   "op_id": "3eefd4a474234c2eada4696edf71bccb",
    "site_id": "site_2",
    "lamport": 308,
    "type": "delete",
@@ -1493,7 +1493,7 @@
    ]
   },
   {
-   "op_id": "adc40e96908b449894dfe18ad46c4ecc",
+   "op_id": "66c2a57acf7b45fca24983905424d275",
    "site_id": "site_1",
    "lamport": 309,
    "type": "insert",
@@ -1502,7 +1502,7 @@
    "text": "LG"
   },
   {
-   "op_id": "468e7b9c2457443581aaeff9b25d6276",
+   "op_id": "7a0afe45a2ff499687a898cc1f23bad2",
    "site_id": "site_1",
    "lamport": 312,
    "type": "insert",
@@ -1511,7 +1511,7 @@
    "text": "38"
   },
   {
-   "op_id": "19e6958bda9b40f4b69849731ac9306f",
+   "op_id": "20703b0011f745549c771e9864b8faef",
    "site_id": "site_4",
    "lamport": 311,
    "type": "insert",
@@ -1520,7 +1520,7 @@
    "text": "W"
   },
   {
-   "op_id": "bb00427c4ec34414b5f44ca99123eaa6",
+   "op_id": "6c092b8ec834493ebe76272c58dd1ed0",
    "site_id": "site_4",
    "lamport": 314,
    "type": "insert",
@@ -1529,7 +1529,7 @@
    "text": "HU"
   },
   {
-   "op_id": "c860199a4d29484da1bb6b23556d2a3b",
+   "op_id": "67cdf30fccfb4b1c906079f7e7f4a66f",
    "site_id": "site_3",
    "lamport": 319,
    "type": "insert",
@@ -1538,7 +1538,7 @@
    "text": "50YE4"
   },
   {
-   "op_id": "2def1ea1146b4490b89553356345d8b4",
+   "op_id": "7a96a89c13be4ccbba293389277cb0ea",
    "site_id": "site_0",
    "lamport": 316,
    "type": "delete",
@@ -1558,7 +1558,7 @@
    ]
   },
   {
-   "op_id": "6e4db9edd3e7454dad7bd6a5f978ea7e",
+   "op_id": "57c9f28c82014e1b8d37c6e77541bf9f",
    "site_id": "site_2",
    "lamport": 322,
    "type": "insert",
@@ -1567,7 +1567,7 @@
    "text": "V"
   },
   {
-   "op_id": "749ee11f3a9144aa8871213629b9a264",
+   "op_id": "b5a2c4706d3f415ba943f25a023352c8",
    "site_id": "site_2",
    "lamport": 324,
    "type": "delete",
@@ -1583,7 +1583,7 @@
    ]
   },
   {
-   "op_id": "a2998ce3546b44309cc813e3ded66d76",
+   "op_id": "973aaf18c41f4103896e7231c9ba03d2",
    "site_id": "site_0",
    "lamport": 326,
    "type": "delete",
@@ -1595,7 +1595,7 @@
    ]
   },
   {
-   "op_id": "29aaa9e63edd4ee6851f49bf74c1304f",
+   "op_id": "0a936b8c504f4039acd4ec168d1df8c1",
    "site_id": "site_3",
    "lamport": 324,
    "type": "delete",
@@ -1607,7 +1607,7 @@
    ]
   },
   {
-   "op_id": "b4648f676cd94139b37845225ba71465",
+   "op_id": "0295d7d6afb1454084aa9050514ec43e",
    "site_id": "site_4",
    "lamport": 332,
    "type": "insert",
@@ -1616,7 +1616,7 @@
    "text": "91OC"
   },
   {
-   "op_id": "001062e5a1fd4cde992325d42509376d",
+   "op_id": "650897a453f045bea1fb937ed7daf9bb",
    "site_id": "site_2",
    "lamport": 325,
    "type": "delete",
@@ -1628,7 +1628,7 @@
    ]
   },
   {
-   "op_id": "8d655165f029473f899b9a822c3972ab",
+   "op_id": "faa7fa5269da438c8743c45a469b9210",
    "site_id": "site_0",
    "lamport": 334,
    "type": "insert",
@@ -1637,7 +1637,7 @@
    "text": "O"
   },
   {
-   "op_id": "57ef6045cf7e475082cb12103a488ad6",
+   "op_id": "ab9661527fed479e91a1b956de5a0537",
    "site_id": "site_2",
    "lamport": 336,
    "type": "delete",

@@ -90,6 +90,7 @@ class SyncClient {
     this.onMissedSummaryReceived = options.onMissedSummaryReceived || noop;
     this.onSuggestionReceived = options.onSuggestionReceived || noop;
     this.onSuggestionUpdated = options.onSuggestionUpdated || noop;
+    this.onServerError = options.onServerError || noop;
 
     this.socket = null;
     this.isConnected = false;
@@ -280,6 +281,7 @@ class SyncClient {
       this.onSuggestionUpdated(msg);
     } else if (type === 'error') {
       console.warn('Server error:', msg);
+      this.onServerError(msg);
     }
   }
 

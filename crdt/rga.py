@@ -397,8 +397,11 @@ class RGA:
 
         for node in self.iter_nodes():
             cid = node.char_id
-            if chars and cid.site_id == run_site and cid.clock == run_next_clock and (
-                node.deleted == run_deleted
+            if (
+                chars
+                and cid.site_id == run_site
+                and cid.clock == run_next_clock
+                and (node.deleted == run_deleted)
             ):
                 chars.append(node.char)
                 run_next_clock += 1
@@ -431,7 +434,9 @@ class RGA:
             for first_raw, text, deleted in data["runs"]:
                 first = CharId.from_str(first_raw)
                 for offset, char in enumerate(text):
-                    nodes.append(Node(CharId(first.clock + offset, first.site_id), char, bool(deleted)))
+                    nodes.append(
+                        Node(CharId(first.clock + offset, first.site_id), char, bool(deleted))
+                    )
         else:
             for item in data.get("nodes", []):
                 nodes.append(

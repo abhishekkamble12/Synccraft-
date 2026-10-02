@@ -70,20 +70,29 @@ class FakeLLMClient(BaseLLMClient):
 
 class OpenAICompatibleLLMClient(BaseLLMClient):
     """
-    Generic HTTP client supporting OpenAI / Claude / Local LLM completions.
+    Generic HTTP client supporting OpenAI / Groq / Claude / Local LLM completions.
     """
 
     def __init__(
         self,
         api_key: str | None = None,
-        base_url: str = "https://api.openai.com/v1",
-        model: str = "gpt-4o-mini",
+        base_url: str | None = None,
+        model: str | None = None,
     ) -> None:
-        self.api_key = api_key or os.environ.get("LLM_API_KEY", "")
+        groq_key = os.environ.get("GROQ_API_KEY", "")
+        self.api_key = api_key or os.environ.get("LLM_API_KEY") or groq_key
         if not self.api_key:
-            raise ValueError("OpenAICompatibleLLMClient requires LLM_API_KEY.")
-        self.base_url = os.environ.get("LLM_BASE_URL", base_url)
-        self.model = os.environ.get("LLM_MODEL", model)
+            raise ValueError("OpenAICompatibleLLMClient requires LLM_API_KEY or GROQ_API_KEY.")
+
+        # Automatically default to Groq if GROQ_API_KEY is supplied or key starts with 'gsk_'
+        is_groq = bool(groq_key) or self.api_key.startswith("gsk_")
+        default_base_url = (
+            "https://api.groq.com/openai/v1" if is_groq else "https://api.openai.com/v1"
+        )
+        default_model = "openai/gpt-oss-120b" if is_groq else "gpt-4o-mini"
+
+        self.base_url = os.environ.get("LLM_BASE_URL") or base_url or default_base_url
+        self.model = os.environ.get("LLM_MODEL") or model or default_model
 
     async def stream_completion(
         self,
@@ -137,7 +146,7 @@ class OpenAICompatibleLLMClient(BaseLLMClient):
 
 
 def get_configured_llm_client() -> BaseLLMClient:
-    """Use the real LLM when `LLM_API_KEY` is set, otherwise the deterministic fake."""
-    if os.environ.get("LLM_API_KEY"):
+    """Use the real LLM when `GROQ_API_KEY` or `LLM_API_KEY` is set, otherwise the deterministic fake."""
+    if os.environ.get("GROQ_API_KEY") or os.environ.get("LLM_API_KEY"):
         return OpenAICompatibleLLMClient()
     return FakeLLMClient()

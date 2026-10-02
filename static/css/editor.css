@@ -883,6 +883,10 @@ a:hover {
   border-radius: var(--radius-xl);
   padding: var(--space-3) var(--space-5);
   flex-shrink: 0;
+  /* backdrop-filter makes the header its own stacking context; lift it above the
+     editor container so the AI Assist dropdown isn't painted underneath it. */
+  position: relative;
+  z-index: var(--z-sticky);
 }
 
 .editor-title-container {
@@ -1145,6 +1149,75 @@ a:hover {
   transform: translate(-50%, -100%);
   margin-top: -8px;
   animation: toolbarPop var(--duration-normal) var(--ease-spring);
+}
+
+.floating-ai-toolbar.is-below {
+  transform: translate(-50%, 0);
+  margin-top: 8px;
+}
+
+/* Header AI Assist menu */
+.ai-menu {
+  position: relative;
+}
+
+.ai-menu-btn {
+  background: var(--ai-bg);
+  color: var(--ai-light);
+  border: 1px solid var(--ai-border);
+  box-shadow: none;
+}
+
+.ai-menu-btn:hover,
+.ai-menu.is-open .ai-menu-btn {
+  background: rgba(139, 92, 246, 0.22);
+  box-shadow: var(--shadow-glow-ai);
+}
+
+.ai-menu-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: var(--z-toolbar);
+  min-width: 220px;
+  display: none;
+  flex-direction: column;
+  padding: var(--space-1);
+  background: var(--surface-2);
+  border: 1px solid var(--ai-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xl), var(--shadow-glow-ai);
+}
+
+.ai-menu.is-open .ai-menu-dropdown {
+  display: flex;
+}
+
+.ai-menu-hint {
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border-default);
+  margin-bottom: var(--space-1);
+}
+
+.ai-menu-dropdown button {
+  background: transparent;
+  color: var(--text-secondary);
+  border: none;
+  text-align: left;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  font-family: var(--font-sans);
+  cursor: pointer;
+}
+
+.ai-menu-dropdown button:hover,
+.ai-menu-dropdown button:focus-visible {
+  background: var(--ai-bg);
+  color: var(--ai-light);
+  outline: none;
 }
 
 .floating-ai-toolbar button {

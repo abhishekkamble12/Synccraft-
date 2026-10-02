@@ -17,6 +17,9 @@ x-app-env: &app-env
   DB_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
   REDIS_URL: redis://redis:6379/0
   LLM_API_KEY: ${LLM_API_KEY:-}
+  GROQ_API_KEY: ${GROQ_API_KEY:-}
+  LLM_BASE_URL: ${LLM_BASE_URL:-}
+  LLM_MODEL: ${LLM_MODEL:-}
 
 x-app: &app
   build: .
@@ -43,7 +46,7 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "127.0.0.1:6379:6379"
+      - "127.0.0.1:${REDIS_HOST_PORT:-6379}:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 3s
@@ -57,7 +60,8 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
     ports:
-      - "127.0.0.1:5432:5432"
+      # Host side defaults to 5433 so a locally installed Postgres on 5432 doesn't clash.
+      - "127.0.0.1:${POSTGRES_HOST_PORT:-5433}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:

@@ -212,10 +212,15 @@ class AIPeer:
             if self.check_cancelled():
                 raise JobCancelledError("AI job was cancelled by user.")
 
+            if kind == "continue":
+                # Continuing keeps the source text and adds the new paragraphs after it.
+                sep = "" if not target_text or target_text[-1].isspace() else "\n\n"
+                polished_text = sep + polished_text
             ops_count = self.apply_text_replacement(
                 start_anchor=job.anchor_start,
                 end_anchor=job.anchor_end,
                 replacement_text=polished_text,
+                append=kind == "continue",
             )
 
             latency_ms = int((time.monotonic() - start_time) * 1000)
@@ -262,10 +267,14 @@ class AIPeer:
         start_anchor: str | None,
         end_anchor: str | None,
         replacement_text: str,
+        append: bool = False,
     ) -> int:
         """
         Convert a text transformation into CRDT insert & delete ops, commit them in
         one batch, and broadcast them to the room. Returns the number of ops applied.
+
+        With `append`, the anchored range is left untouched and the text is
+        inserted right after it.
 
         The ops are generated against the latest server state; any human edits that
         land between generation and commit are concurrent ops and merge normally.
@@ -273,6 +282,8 @@ class AIPeer:
         state = get_document_state(self.doc_id)
         working = RGA.from_dict(state.state, site_id=self.site_id)
         start_pos, end_pos, _ = self.resolve_anchor_range(working, start_anchor, end_anchor)
+        if append:
+            start_pos = end_pos
         ops = diff_to_ops(working, start_pos, end_pos, replacement_text)
 
         # The ops are based on `state.seq`; if tombstone GC overtook that state in

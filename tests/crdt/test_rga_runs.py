@@ -91,7 +91,9 @@ edit = st.tuples(
 
 @settings(max_examples=150, deadline=None)
 @given(st.lists(edit, min_size=1, max_size=40), st.randoms(use_true_random=False))
-def test_property_runs_converge(edits: list[tuple[int, bool, int, str, int, int]], rnd: random.Random) -> None:
+def test_property_runs_converge(
+    edits: list[tuple[int, bool, int, str, int, int]], rnd: random.Random
+) -> None:
     sites = [RGA(f"s{i}") for i in range(3)]
     log: list[Op] = []
     for site_idx, is_delete, pos_seed, text, del_len, fanout in edits:
@@ -148,9 +150,15 @@ def test_honest_ops_validate() -> None:
         # Claims another site's ids.
         (Op.create_insert("mallory", CharId(50, "alice"), ROOT, "x"), "char_id_site_mismatch"),
         # Parent never existed: an orphan the server would otherwise buffer forever.
-        (Op.create_insert("mallory", CharId(50, "mallory"), CharId(9, "ghost"), "x"), "unknown_parent"),
+        (
+            Op.create_insert("mallory", CharId(50, "mallory"), CharId(9, "ghost"), "x"),
+            "unknown_parent",
+        ),
         # Id not greater than its parent's: breaks RGA's ordering argument.
-        (Op.create_insert("mallory", CharId(3, "mallory"), CharId(5, "alice"), "x"), "clock_not_after_parent"),
+        (
+            Op.create_insert("mallory", CharId(3, "mallory"), CharId(5, "alice"), "x"),
+            "clock_not_after_parent",
+        ),
         # Lamport inconsistent with the run length.
         (
             Op(

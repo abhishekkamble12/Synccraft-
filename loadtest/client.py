@@ -16,6 +16,7 @@ clients must live in one process.
 """
 
 import asyncio
+import contextlib
 import json
 import random
 import secrets
@@ -107,10 +108,8 @@ class SimulatedClient:
     async def _run(self) -> None:
         backoff = 0.2
         while not self.closing:
-            try:
+            with contextlib.suppress(TimeoutError, ConnectionClosed, OSError):
                 await self._listen()
-            except (ConnectionClosed, OSError, asyncio.TimeoutError):
-                pass
             if self.closing:
                 return
             self.ready.clear()
@@ -121,7 +120,7 @@ class SimulatedClient:
                 await self._connect_once()
                 self.stats.reconnects += 1
                 backoff = 0.2
-            except (OSError, asyncio.TimeoutError, websockets.InvalidStatus, websockets.InvalidHandshake):
+            except (TimeoutError, OSError, websockets.InvalidStatus, websockets.InvalidHandshake):
                 backoff = min(backoff * 2, 5.0)
 
     async def _report_stable(self) -> None:
@@ -129,9 +128,12 @@ class SimulatedClient:
         while not self.closing:
             await asyncio.sleep(STABLE_INTERVAL_SEC)
             floor = min([self.contiguous, *(base for _, base in self.pending.values())])
-            if floor != last and self.ready.is_set():
-                if await self._send({"type": "stable", "seq": floor}):
-                    last = floor
+            if (
+                floor != last
+                and self.ready.is_set()
+                and await self._send({"type": "stable", "seq": floor})
+            ):
+                last = floor
 
     # ------------------------------------------------------------------ sending
 

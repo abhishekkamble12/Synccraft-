@@ -60,7 +60,7 @@ python manage.py migrate
 daphne -b 127.0.0.1 -p 8000 config.asgi:application
 ```
 
-Set `LLM_API_KEY` (and optionally `LLM_BASE_URL` / `LLM_MODEL`) for a real OpenAI-compatible model. Without it, AI features use a deterministic fake.
+Set `GROQ_API_KEY` (or `LLM_API_KEY`) for a real model. When `GROQ_API_KEY` or a key starting with `gsk_` is set, requests are automatically routed to Groq's API (`openai/gpt-oss-120b`). You can also configure other OpenAI-compatible endpoints with `LLM_BASE_URL` and `LLM_MODEL`. Without an API key, AI features use a deterministic offline fake.
 
 ## Tests
 
